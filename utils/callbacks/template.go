@@ -20,7 +20,7 @@ package callbacks
 import (
 	"context"
 
-	"github.com/cloudwego/eino/adk"
+	// "github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/document"
@@ -64,7 +64,6 @@ type HandlerHelper struct {
 	transformerHandler      *TransformerCallbackHandler
 	toolHandler             *ToolCallbackHandler
 	toolsNodeHandler        *ToolsNodeCallbackHandlers
-	agentHandler            *AgentCallbackHandler
 	agenticPromptHandler    *AgenticPromptCallbackHandler
 	agenticModelHandler     *AgenticModelCallbackHandler
 	agenticToolsNodeHandler *AgenticToolsNodeCallbackHandlers
@@ -149,10 +148,10 @@ func (c *HandlerHelper) AgenticToolsNode(handler *AgenticToolsNodeCallbackHandle
 }
 
 // Agent sets the agent handler for the handler helper, which will be called when the agent is executed.
-func (c *HandlerHelper) Agent(handler *AgentCallbackHandler) *HandlerHelper {
-	c.agentHandler = handler
-	return c
-}
+// func (c *HandlerHelper) Agent(handler *AgentCallbackHandler) *HandlerHelper {
+// 	c.agentHandler = handler
+// 	return c
+// }
 
 // Graph sets the graph handler for the handler helper, which will be called when the graph is executed.
 func (c *HandlerHelper) Graph(handler callbacks.Handler) *HandlerHelper {
@@ -204,8 +203,6 @@ func (c *handlerTemplate) OnStart(ctx context.Context, info *callbacks.RunInfo, 
 		return c.toolsNodeHandler.OnStart(ctx, info, convToolsNodeCallbackInput(input))
 	case compose.ComponentOfAgenticToolsNode:
 		return c.agenticToolsNodeHandler.OnStart(ctx, info, convAgenticToolsNodeCallbackInput(input))
-	case adk.ComponentOfAgent:
-		return c.agentHandler.OnStart(ctx, info, adk.ConvAgentCallbackInput(input))
 	case compose.ComponentOfGraph,
 		compose.ComponentOfChain,
 		compose.ComponentOfLambda:
@@ -243,8 +240,6 @@ func (c *handlerTemplate) OnEnd(ctx context.Context, info *callbacks.RunInfo, ou
 		return c.toolsNodeHandler.OnEnd(ctx, info, convToolsNodeCallbackOutput(output))
 	case compose.ComponentOfAgenticToolsNode:
 		return c.agenticToolsNodeHandler.OnEnd(ctx, info, convAgenticToolsNodeCallbackOutput(output))
-	case adk.ComponentOfAgent:
-		return c.agentHandler.OnEnd(ctx, info, adk.ConvAgentCallbackOutput(output))
 	case compose.ComponentOfGraph,
 		compose.ComponentOfChain,
 		compose.ComponentOfLambda:
@@ -398,10 +393,6 @@ func (c *handlerTemplate) Needed(ctx context.Context, info *callbacks.RunInfo, t
 		}
 	case compose.ComponentOfAgenticToolsNode:
 		if c.agenticToolsNodeHandler != nil && c.agenticToolsNodeHandler.Needed(ctx, info, timing) {
-			return true
-		}
-	case adk.ComponentOfAgent:
-		if c.agentHandler != nil && c.agentHandler.Needed(ctx, info, timing) {
 			return true
 		}
 	case compose.ComponentOfGraph,
@@ -641,22 +632,6 @@ func convToolsNodeCallbackOutput(src callbacks.CallbackInput) []*schema.Message 
 		return t
 	default:
 		return nil
-	}
-}
-
-type AgentCallbackHandler struct {
-	OnStart func(ctx context.Context, info *callbacks.RunInfo, input *adk.AgentCallbackInput) context.Context
-	OnEnd   func(ctx context.Context, info *callbacks.RunInfo, output *adk.AgentCallbackOutput) context.Context
-}
-
-func (ch *AgentCallbackHandler) Needed(ctx context.Context, info *callbacks.RunInfo, timing callbacks.CallbackTiming) bool {
-	switch timing {
-	case callbacks.TimingOnStart:
-		return ch.OnStart != nil
-	case callbacks.TimingOnEnd:
-		return ch.OnEnd != nil
-	default:
-		return false
 	}
 }
 
