@@ -107,6 +107,11 @@ func (g *Graph[I, O]) AddEdge(startNode, endNode string) (err error) {
 	return g.graph.addEdgeWithMappings(startNode, endNode, false, false)
 }
 
+// AddEdgeWithOptions adds an edge with explicit control/data and mapping options.
+func (g *Graph[I, O]) AddEdgeWithOptions(startNode, endNode string, noControl, noData bool, mappings ...*FieldMapping) error {
+	return g.graph.addEdgeWithMappings(startNode, endNode, noControl, noData, mappings...)
+}
+
 // Compile take the raw graph and compile it into a form ready to be run.
 // e.g.
 //

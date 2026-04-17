@@ -528,6 +528,18 @@ func (wf *Workflow[I, O]) initNode(key string) *WorkflowNode {
 	return n
 }
 
+// Node returns the workflow node by key when present.
+func (wf *Workflow[I, O]) Node(key string) *WorkflowNode {
+	if key == END {
+		return wf.End()
+	}
+	node, ok := wf.workflowNodes[key]
+	if !ok {
+		return nil
+	}
+	return node
+}
+
 func (wf *Workflow[I, O]) getGenericHelper() *genericHelper {
 	return wf.g.getGenericHelper()
 }
