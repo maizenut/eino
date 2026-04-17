@@ -29,6 +29,7 @@ type graphCompileOptions struct {
 	serializer           Serializer
 	interruptBeforeNodes []string
 	interruptAfterNodes  []string
+	nodeInterceptors     []NodeInterceptor
 
 	eagerDisabled bool
 

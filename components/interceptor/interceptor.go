@@ -1,0 +1,73 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package interceptor
+
+import (
+	"context"
+
+	"github.com/cloudwego/eino/components"
+)
+
+// NodeExecutor is the executable function signature for a graph node invocation.
+type NodeExecutor func(ctx context.Context, input any) (any, error)
+
+// NodeInfo describes the node currently being executed.
+type NodeInfo struct {
+	Key               string
+	Name              string
+	Component         components.Component
+	ComponentImplType string
+	IsStream          bool
+}
+
+// NodeInterceptor defines runtime around hooks for graph node execution.
+type NodeInterceptor interface {
+	// BeforeNode runs before the node executes and may replace ctx or input.
+	BeforeNode(ctx context.Context, info NodeInfo, input any) (context.Context, any, error)
+
+	// AfterNode runs after the node succeeds and may replace ctx or output.
+	AfterNode(ctx context.Context, info NodeInfo, output any) (context.Context, any, error)
+
+	// OnErrorNode runs after the node fails and may replace ctx or err.
+	OnErrorNode(ctx context.Context, info NodeInfo, err error) (context.Context, error)
+
+	// WrapNode wraps the whole node execution chain.
+	WrapNode(ctx context.Context, info NodeInfo, next NodeExecutor) NodeExecutor
+}
+
+// BaseNodeInterceptor provides a no-op implementation of NodeInterceptor.
+type BaseNodeInterceptor struct{}
+
+// BeforeNode implements NodeInterceptor.
+func (b *BaseNodeInterceptor) BeforeNode(ctx context.Context, _ NodeInfo, input any) (context.Context, any, error) {
+	return ctx, input, nil
+}
+
+// AfterNode implements NodeInterceptor.
+func (b *BaseNodeInterceptor) AfterNode(ctx context.Context, _ NodeInfo, output any) (context.Context, any, error) {
+	return ctx, output, nil
+}
+
+// OnErrorNode implements NodeInterceptor.
+func (b *BaseNodeInterceptor) OnErrorNode(ctx context.Context, _ NodeInfo, err error) (context.Context, error) {
+	return ctx, err
+}
+
+// WrapNode implements NodeInterceptor.
+func (b *BaseNodeInterceptor) WrapNode(_ context.Context, _ NodeInfo, next NodeExecutor) NodeExecutor {
+	return next
+}

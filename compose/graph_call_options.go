@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/callbacks"
@@ -99,6 +100,9 @@ type Option struct {
 
 	paths []*NodePath
 
+	nodeInterceptors      []NodeInterceptor
+	nodeInterceptorByPath map[string][]NodeInterceptor
+
 	maxRunSteps         int
 	checkPointID        *string
 	writeToCheckPointID *string
@@ -116,11 +120,24 @@ func (o Option) deepCopy() Option {
 		nPath := *path
 		nPaths[i] = &nPath
 	}
+	nInterceptors := make([]NodeInterceptor, len(o.nodeInterceptors))
+	copy(nInterceptors, o.nodeInterceptors)
+	var nInterceptorByPath map[string][]NodeInterceptor
+	if len(o.nodeInterceptorByPath) > 0 {
+		nInterceptorByPath = make(map[string][]NodeInterceptor, len(o.nodeInterceptorByPath))
+		for path, interceptors := range o.nodeInterceptorByPath {
+			copied := make([]NodeInterceptor, len(interceptors))
+			copy(copied, interceptors)
+			nInterceptorByPath[path] = copied
+		}
+	}
 	return Option{
-		options:     nOptions,
-		handler:     nHandler,
-		paths:       nPaths,
-		maxRunSteps: o.maxRunSteps,
+		options:               nOptions,
+		handler:               nHandler,
+		paths:                 nPaths,
+		nodeInterceptors:      nInterceptors,
+		nodeInterceptorByPath: nInterceptorByPath,
+		maxRunSteps:           o.maxRunSteps,
 	}
 }
 
@@ -227,6 +244,30 @@ func WithCallbacks(cbs ...callbacks.Handler) Option {
 	}
 }
 
+// WithNodeInterceptor adds runtime interceptors for every node in a single call.
+func WithNodeInterceptor(interceptors ...NodeInterceptor) Option {
+	return Option{
+		nodeInterceptors: interceptors,
+	}
+}
+
+// WithNodeInterceptorFor adds runtime interceptors for a designated node path.
+func WithNodeInterceptorFor(nodeKey string, interceptors ...NodeInterceptor) Option {
+	return WithNodeInterceptorForPath(NewNodePath(nodeKey), interceptors...)
+}
+
+// WithNodeInterceptorForPath adds runtime interceptors for a designated node path.
+func WithNodeInterceptorForPath(path *NodePath, interceptors ...NodeInterceptor) Option {
+	if path == nil || len(path.path) == 0 {
+		return Option{}
+	}
+	return Option{
+		nodeInterceptorByPath: map[string][]NodeInterceptor{
+			nodePathKey(path): interceptors,
+		},
+	}
+}
+
 // WithRuntimeMaxSteps sets the maximum number of steps for the graph runtime.
 // e.g.
 //
@@ -246,6 +287,29 @@ func withComponentOption[TOption any](opts ...TOption) Option {
 		options: o,
 		paths:   make([]*NodePath, 0),
 	}
+}
+
+func (o *Option) getNodeInterceptors(nodeKey string) []NodeInterceptor {
+	if o == nil {
+		return nil
+	}
+
+	interceptors := make([]NodeInterceptor, 0, len(o.nodeInterceptors))
+	interceptors = append(interceptors, o.nodeInterceptors...)
+	if len(o.nodeInterceptorByPath) == 0 {
+		return interceptors
+	}
+	if scoped, ok := o.nodeInterceptorByPath[nodePathKey(NewNodePath(nodeKey))]; ok {
+		interceptors = append(interceptors, scoped...)
+	}
+	return interceptors
+}
+
+func nodePathKey(path *NodePath) string {
+	if path == nil {
+		return ""
+	}
+	return strings.Join(path.path, ".")
 }
 
 func convertOption[TOption any](opts ...any) ([]TOption, error) {

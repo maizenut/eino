@@ -294,7 +294,8 @@ func (t *taskManager) execute(currentTask *task) {
 	}()
 
 	ctx := initNodeCallbacks(currentTask.ctx, currentTask.nodeKey, currentTask.call.action.nodeInfo, currentTask.call.action.meta, t.opts...)
-	currentTask.output, currentTask.err = t.runWrapper(ctx, currentTask.call.action, currentTask.input, currentTask.option...)
+	currentTask.call.info.IsStream = currentTask.call.action.t != nil && currentTask.call.action.i == nil
+	currentTask.output, currentTask.err = runWithNodeInterceptors(ctx, currentTask.call, currentTask.input, t.runWrapper, currentTask.option...)
 }
 
 func (t *taskManager) submit(tasks []*task) error {

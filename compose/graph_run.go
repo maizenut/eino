@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/cloudwego/eino/components/interceptor"
 	"github.com/cloudwego/eino/internal"
 	"github.com/cloudwego/eino/internal/core"
 	"github.com/cloudwego/eino/internal/serialization"
@@ -36,6 +37,8 @@ type chanCall struct {
 	controls []string // branch must control
 
 	preProcessor, postProcessor *composableRunnable
+	interceptors                []NodeInterceptor
+	info                        interceptor.NodeInfo
 }
 
 type chanBuilder func(dependencies []string, indirectDependencies []string, zeroValue func() any, emptyStream func() streamReader) channel
@@ -104,6 +107,54 @@ func runnableInvoke(ctx context.Context, r *composableRunnable, input any, opts 
 
 func runnableTransform(ctx context.Context, r *composableRunnable, input any, opts ...any) (any, error) {
 	return r.t(ctx, input.(streamReader), opts...)
+}
+
+func runWithNodeInterceptors(ctx context.Context, call *chanCall, input any, run runnableCallWrapper, opts ...any) (any, error) {
+	if call == nil || len(call.interceptors) == 0 {
+		return run(ctx, call.action, input, opts...)
+	}
+
+	info := call.info
+	base := func(execCtx context.Context, execInput any) (any, error) {
+		return run(execCtx, call.action, execInput, opts...)
+	}
+
+	for i := len(call.interceptors) - 1; i >= 0; i-- {
+		base = interceptor.NodeExecutor(call.interceptors[i].WrapNode(ctx, info, interceptor.NodeExecutor(base)))
+	}
+
+	for _, ni := range call.interceptors {
+		var err error
+		ctx, input, err = ni.BeforeNode(ctx, info, input)
+		if err != nil {
+			return nil, runNodeInterceptorError(ctx, info, call.interceptors, err)
+		}
+	}
+
+	output, err := base(ctx, input)
+	if err != nil {
+		return nil, runNodeInterceptorError(ctx, info, call.interceptors, err)
+	}
+
+	for i := len(call.interceptors) - 1; i >= 0; i-- {
+		outputCtx, outputValue, afterErr := call.interceptors[i].AfterNode(ctx, info, output)
+		ctx = outputCtx
+		if afterErr != nil {
+			return nil, runNodeInterceptorError(ctx, info, call.interceptors[:i+1], afterErr)
+		}
+		output = outputValue
+	}
+
+	return output, nil
+}
+
+func runNodeInterceptorError(ctx context.Context, info interceptor.NodeInfo, interceptors []NodeInterceptor, err error) error {
+	for i := len(interceptors) - 1; i >= 0; i-- {
+		var nextCtx context.Context
+		nextCtx, err = interceptors[i].OnErrorNode(ctx, info, err)
+		ctx = nextCtx
+	}
+	return err
 }
 
 func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Option) (result any, err error) {

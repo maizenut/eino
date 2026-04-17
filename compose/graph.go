@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/eino/components/document"
 	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
+	"github.com/cloudwego/eino/components/interceptor"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/retriever"
@@ -743,6 +744,14 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 
 			preProcessor:  node.nodeInfo.preProcessor,
 			postProcessor: node.nodeInfo.postProcessor,
+			interceptors:  opt.nodeInterceptors,
+			info: interceptor.NodeInfo{
+				Key:               name,
+				Name:              node.nodeInfo.name,
+				Component:         node.executorMeta.component,
+				ComponentImplType: node.executorMeta.componentImplType,
+				IsStream:          false,
+			},
 		}
 
 		branches := g.branches[name]
