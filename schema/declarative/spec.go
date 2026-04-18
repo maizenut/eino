@@ -5,6 +5,7 @@ import "github.com/cloudwego/eino/components"
 const (
 	RefKindBlueprintDocument    = "blueprint_document"
 	RefKindComponentDocument    = "component_document"
+	RefKindSkillDocument        = "skill_document"
 	RefKindInterpreterFunction  = "interpreter_function"
 	RefKindInterpreterComponent = "interpreter_component"
 	RefKindInterpreterGraph     = "interpreter_graph"
