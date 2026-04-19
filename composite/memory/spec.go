@@ -79,6 +79,9 @@ type WritePolicySpec struct {
 	// ExtractRef points to a component or function that structures raw content
 	// before writing (e.g. an entity extractor or fact parser).
 	ExtractRef *schemad.Ref `json:"extract_ref,omitempty"`
+	// SummaryRef points to a summariser component or function used when
+	// SummarizeBefore is enabled.
+	SummaryRef *schemad.Ref `json:"summary_ref,omitempty"`
 	// SummarizeBefore requests a summary to be generated before writing.
 	SummarizeBefore bool           `json:"summarize_before,omitempty"`
 	Metadata        map[string]any `json:"metadata,omitempty"`

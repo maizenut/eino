@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/interceptor"
 	mempkg "github.com/cloudwego/eino/composite/memory"
 )
 
@@ -73,7 +72,7 @@ func (a *stubMemoryAssembler) Build(ctx context.Context, spec *mempkg.MemorySpec
 func TestMemoryNodeInterceptorUsesBinding(t *testing.T) {
 	binding := &stubMemoryBinding{}
 	interceptorInstance := NewMemoryNodeInterceptor(&stubRuntimeMemory{binding: binding}, nil, nil, nil)
-	ctx, input, err := interceptorInstance.BeforeNode(context.Background(), interceptor.NodeInfo{Key: "chat"}, "in")
+	ctx, input, err := interceptorInstance.BeforeNode(context.Background(), NodeInfo{Key: "chat"}, "in")
 	if err != nil {
 		t.Fatalf("BeforeNode error = %v", err)
 	}
@@ -83,7 +82,7 @@ func TestMemoryNodeInterceptorUsesBinding(t *testing.T) {
 	if got := ctx.Value(MemoryBindingContextKey("memory.records")); got != "ok" {
 		t.Fatalf("context value = %#v, want ok", got)
 	}
-	_, output, err := interceptorInstance.AfterNode(context.Background(), interceptor.NodeInfo{Key: "chat"}, "out")
+	_, output, err := interceptorInstance.AfterNode(context.Background(), NodeInfo{Key: "chat"}, "out")
 	if err != nil {
 		t.Fatalf("AfterNode error = %v", err)
 	}
@@ -102,7 +101,7 @@ func TestMemoryNodeInterceptorBuildsFromSpec(t *testing.T) {
 	binding := &stubMemoryBinding{}
 	assembler := &stubMemoryAssembler{mem: &stubRuntimeMemory{binding: binding}}
 	interceptorInstance := NewMemoryNodeInterceptor(nil, nil, &mempkg.MemorySpec{Info: mempkg.Info{Name: "spec"}}, assembler)
-	ctx, _, err := interceptorInstance.BeforeNode(context.Background(), interceptor.NodeInfo{Key: "node-1"}, nil)
+	ctx, _, err := interceptorInstance.BeforeNode(context.Background(), NodeInfo{Key: "node-1"}, nil)
 	if err != nil {
 		t.Fatalf("BeforeNode error = %v", err)
 	}
@@ -161,7 +160,7 @@ func TestMemoryCompileOptionsPassAssemblerToInterceptor(t *testing.T) {
 	if !ok {
 		t.Fatalf("interceptor type = %T, want *memoryNodeInterceptor", options.nodeInterceptors[0])
 	}
-	ctx, _, err := memoryInterceptor.BeforeNode(context.Background(), interceptor.NodeInfo{Key: "node-2"}, nil)
+	ctx, _, err := memoryInterceptor.BeforeNode(context.Background(), NodeInfo{Key: "node-2"}, nil)
 	if err != nil {
 		t.Fatalf("BeforeNode error = %v", err)
 	}

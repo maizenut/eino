@@ -16,6 +16,12 @@ func resolvedStoreOptions(opts []StoreOption) storeOptions {
 	return out
 }
 
+// ResolvedStoreOptions is the public view of merged StoreOption values.
+type ResolvedStoreOptions struct {
+	Namespace string
+	Extra     map[string]any
+}
+
 // resolvedRuntimeOptions merges RuntimeMemory Option values.
 func resolvedRuntimeOptions(opts []Option) runtimeOptions {
 	var out runtimeOptions
@@ -25,6 +31,12 @@ func resolvedRuntimeOptions(opts []Option) runtimeOptions {
 		}
 	}
 	return out
+}
+
+// ResolvedRuntimeOptions is the public view of merged RuntimeMemory options.
+type ResolvedRuntimeOptions struct {
+	Scope ScopeSpec
+	Extra map[string]any
 }
 
 // resolvedRecallOptions merges RecallOption values.
@@ -38,6 +50,13 @@ func resolvedRecallOptions(opts []RecallOption) recallOptions {
 	return out
 }
 
+// ResolvedRecallOptions is the public view of merged RecallOption values.
+type ResolvedRecallOptions struct {
+	TopK     int
+	MinScore float64
+	Extra    map[string]any
+}
+
 // resolvedWriteOptions merges WriteOption values.
 func resolvedWriteOptions(opts []WriteOption) writeOptions {
 	var out writeOptions
@@ -47,6 +66,49 @@ func resolvedWriteOptions(opts []WriteOption) writeOptions {
 		}
 	}
 	return out
+}
+
+// ResolvedWriteOptions is the public view of merged WriteOption values.
+type ResolvedWriteOptions struct {
+	Mode  string
+	Extra map[string]any
+}
+
+// ResolveStoreOptions merges StoreOption values into an exported result.
+func ResolveStoreOptions(opts ...StoreOption) ResolvedStoreOptions {
+	out := resolvedStoreOptions(opts)
+	return ResolvedStoreOptions{
+		Namespace: out.namespace,
+		Extra:     cloneMap(out.extra),
+	}
+}
+
+// ResolveRuntimeOptions merges RuntimeMemory Option values into an exported result.
+func ResolveRuntimeOptions(opts ...Option) ResolvedRuntimeOptions {
+	out := resolvedRuntimeOptions(opts)
+	return ResolvedRuntimeOptions{
+		Scope: out.scope,
+		Extra: cloneMap(out.extra),
+	}
+}
+
+// ResolveRecallOptions merges RecallOption values into an exported result.
+func ResolveRecallOptions(opts ...RecallOption) ResolvedRecallOptions {
+	out := resolvedRecallOptions(opts)
+	return ResolvedRecallOptions{
+		TopK:     out.topK,
+		MinScore: out.minScore,
+		Extra:    cloneMap(out.extra),
+	}
+}
+
+// ResolveWriteOptions merges WriteOption values into an exported result.
+func ResolveWriteOptions(opts ...WriteOption) ResolvedWriteOptions {
+	out := resolvedWriteOptions(opts)
+	return ResolvedWriteOptions{
+		Mode:  out.mode,
+		Extra: cloneMap(out.extra),
+	}
 }
 
 // ResolveWriteScope returns the effective write scope name.

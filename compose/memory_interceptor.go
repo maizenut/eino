@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/interceptor"
 	mempkg "github.com/cloudwego/eino/composite/memory"
 )
 
 // MemoryBindingContextKey returns the context key used by the default memory interceptor.
+//
+// Deprecated: default memory binding adapters now live under
+// github.com/maizenut/mirorru/interceptors/memorybinding.
 func MemoryBindingContextKey(key string) any {
 	return memoryBindingContextKey(key)
 }
@@ -16,6 +18,8 @@ func MemoryBindingContextKey(key string) any {
 type memoryBindingContextKey string
 
 // MemoryAssembler materializes RuntimeMemory from a declarative spec when needed.
+//
+// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.MemoryAssembler.
 type MemoryAssembler interface {
 	Build(ctx context.Context, spec *mempkg.MemorySpec) (mempkg.RuntimeMemory, error)
 }
@@ -29,6 +33,8 @@ type memoryNodeInterceptor struct {
 }
 
 // NewMemoryNodeInterceptor creates a compose node interceptor backed by RuntimeMemory or MemorySpec.
+//
+// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.NewNodeInterceptor.
 func NewMemoryNodeInterceptor(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) NodeInterceptor {
 	return &memoryNodeInterceptor{
 		memory:    mem,
@@ -38,7 +44,7 @@ func NewMemoryNodeInterceptor(mem mempkg.RuntimeMemory, binding mempkg.Binding, 
 	}
 }
 
-func (i *memoryNodeInterceptor) BeforeNode(ctx context.Context, info interceptor.NodeInfo, input any) (context.Context, any, error) {
+func (i *memoryNodeInterceptor) BeforeNode(ctx context.Context, info NodeInfo, input any) (context.Context, any, error) {
 	binding, err := i.resolveBinding(ctx)
 	if err != nil || binding == nil {
 		return ctx, input, err
@@ -46,7 +52,7 @@ func (i *memoryNodeInterceptor) BeforeNode(ctx context.Context, info interceptor
 	return binding.BeforeNode(ctx, info.Key, input)
 }
 
-func (i *memoryNodeInterceptor) AfterNode(ctx context.Context, info interceptor.NodeInfo, output any) (context.Context, any, error) {
+func (i *memoryNodeInterceptor) AfterNode(ctx context.Context, info NodeInfo, output any) (context.Context, any, error) {
 	binding, err := i.resolveBinding(ctx)
 	if err != nil || binding == nil {
 		return ctx, output, err
@@ -86,11 +92,15 @@ func (i *memoryNodeInterceptor) resolveMemory(ctx context.Context) (mempkg.Runti
 }
 
 // WithMemoryInterceptorOnCompile injects a default memory-backed node interceptor at compile time.
+//
+// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.WithNodeInterceptorOnCompile.
 func WithMemoryInterceptorOnCompile(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) GraphCompileOption {
 	return WithNodeInterceptorsOnCompile(NewMemoryNodeInterceptor(mem, binding, spec, assembler))
 }
 
 // WithMemoryInterceptor injects a default memory-backed node interceptor for a single call.
+//
+// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.WithNodeInterceptor.
 func WithMemoryInterceptor(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) Option {
 	return WithNodeInterceptor(NewMemoryNodeInterceptor(mem, binding, spec, assembler))
 }
