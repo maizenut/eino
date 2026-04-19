@@ -16,58 +16,24 @@
 
 package interceptor
 
-import (
-	"context"
+import composeinterceptor "github.com/cloudwego/eino/compose/interceptor"
 
-	"github.com/cloudwego/eino/components"
-)
+// NodeExecutor is kept as a compatibility alias for compose/interceptor.
+//
+// Deprecated: use github.com/cloudwego/eino/compose/interceptor.NodeExecutor.
+type NodeExecutor = composeinterceptor.NodeExecutor
 
-// NodeExecutor is the executable function signature for a graph node invocation.
-type NodeExecutor func(ctx context.Context, input any) (any, error)
+// NodeInfo is kept as a compatibility alias for compose/interceptor.
+//
+// Deprecated: use github.com/cloudwego/eino/compose/interceptor.NodeInfo.
+type NodeInfo = composeinterceptor.NodeInfo
 
-// NodeInfo describes the node currently being executed.
-type NodeInfo struct {
-	Key               string
-	Name              string
-	Component         components.Component
-	ComponentImplType string
-	IsStream          bool
-}
+// NodeInterceptor is kept as a compatibility alias for compose/interceptor.
+//
+// Deprecated: use github.com/cloudwego/eino/compose/interceptor.NodeInterceptor.
+type NodeInterceptor = composeinterceptor.NodeInterceptor
 
-// NodeInterceptor defines runtime around hooks for graph node execution.
-type NodeInterceptor interface {
-	// BeforeNode runs before the node executes and may replace ctx or input.
-	BeforeNode(ctx context.Context, info NodeInfo, input any) (context.Context, any, error)
-
-	// AfterNode runs after the node succeeds and may replace ctx or output.
-	AfterNode(ctx context.Context, info NodeInfo, output any) (context.Context, any, error)
-
-	// OnErrorNode runs after the node fails and may replace ctx or err.
-	OnErrorNode(ctx context.Context, info NodeInfo, err error) (context.Context, error)
-
-	// WrapNode wraps the whole node execution chain.
-	WrapNode(ctx context.Context, info NodeInfo, next NodeExecutor) NodeExecutor
-}
-
-// BaseNodeInterceptor provides a no-op implementation of NodeInterceptor.
-type BaseNodeInterceptor struct{}
-
-// BeforeNode implements NodeInterceptor.
-func (b *BaseNodeInterceptor) BeforeNode(ctx context.Context, _ NodeInfo, input any) (context.Context, any, error) {
-	return ctx, input, nil
-}
-
-// AfterNode implements NodeInterceptor.
-func (b *BaseNodeInterceptor) AfterNode(ctx context.Context, _ NodeInfo, output any) (context.Context, any, error) {
-	return ctx, output, nil
-}
-
-// OnErrorNode implements NodeInterceptor.
-func (b *BaseNodeInterceptor) OnErrorNode(ctx context.Context, _ NodeInfo, err error) (context.Context, error) {
-	return ctx, err
-}
-
-// WrapNode implements NodeInterceptor.
-func (b *BaseNodeInterceptor) WrapNode(_ context.Context, _ NodeInfo, next NodeExecutor) NodeExecutor {
-	return next
-}
+// BaseNodeInterceptor is kept as a compatibility alias for compose/interceptor.
+//
+// Deprecated: use github.com/cloudwego/eino/compose/interceptor.BaseNodeInterceptor.
+type BaseNodeInterceptor = composeinterceptor.BaseNodeInterceptor

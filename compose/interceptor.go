@@ -16,16 +16,16 @@
 
 package compose
 
-import "github.com/cloudwego/eino/components/interceptor"
+import composeinterceptor "github.com/cloudwego/eino/compose/interceptor"
 
 // NodeInterceptor aliases the runtime node interceptor contract.
-type NodeInterceptor = interceptor.NodeInterceptor
+type NodeInterceptor = composeinterceptor.NodeInterceptor
 
 // BaseNodeInterceptor aliases the no-op runtime node interceptor implementation.
-type BaseNodeInterceptor = interceptor.BaseNodeInterceptor
+type BaseNodeInterceptor = composeinterceptor.BaseNodeInterceptor
 
 // NodeExecutor aliases the graph node executor signature used by interceptors.
-type NodeExecutor = interceptor.NodeExecutor
+type NodeExecutor = composeinterceptor.NodeExecutor
 
 // NodeInfo aliases runtime node execution metadata.
-type NodeInfo = interceptor.NodeInfo
+type NodeInfo = composeinterceptor.NodeInfo
