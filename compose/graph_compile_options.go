@@ -30,6 +30,7 @@ type graphCompileOptions struct {
 	interruptBeforeNodes []string
 	interruptAfterNodes  []string
 	nodeInterceptors     []NodeInterceptor
+	memoryOptions        *MemoryOptions
 
 	eagerDisabled bool
 
@@ -42,6 +43,7 @@ func newGraphCompileOptions(opts ...GraphCompileOption) *graphCompileOptions {
 	for _, o := range opts {
 		o(option)
 	}
+	ensureMemoryInterceptor(option)
 
 	option.origOpts = opts
 
@@ -78,7 +80,7 @@ func WithGraphName(graphName string) GraphCompileOption {
 // If you were using this option previously, it can be safely removed without changing behavior.
 func WithEagerExecution() GraphCompileOption {
 	return func(o *graphCompileOptions) {
-		return
+		_ = o
 	}
 }
 

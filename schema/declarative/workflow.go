@@ -6,23 +6,23 @@ type GraphEdgeMode struct {
 	NoData    bool `json:"no_data,omitempty"`
 }
 
-// FieldMappingSpec declares one workflow field mapping.
+// FieldMappingSpec declares one field mapping.
 type FieldMappingSpec struct {
-	From []string `json:"from,omitempty"`
-	To   []string `json:"to,omitempty"`
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
-// WorkflowInputBlueprint declares an incoming workflow dependency.
-type WorkflowInputBlueprint struct {
+// WorkflowInputSpec declares an incoming workflow dependency.
+type WorkflowInputSpec struct {
 	From               string             `json:"from"`
 	Mappings           []FieldMappingSpec `json:"mappings,omitempty"`
 	NoDirectDependency bool               `json:"no_direct_dependency,omitempty"`
 	DependencyOnly     bool               `json:"dependency_only,omitempty"`
 }
 
-// WorkflowNodeBlueprint declares workflow-only node wiring.
-type WorkflowNodeBlueprint struct {
-	Key         string                   `json:"key"`
-	Inputs      []WorkflowInputBlueprint `json:"inputs,omitempty"`
-	StaticValue map[string]any           `json:"static_value,omitempty"`
+// WorkflowNodeSpec declares workflow-only node wiring.
+type WorkflowNodeSpec struct {
+	Key         string              `json:"key"`
+	Inputs      []WorkflowInputSpec `json:"inputs,omitempty"`
+	StaticValue map[string]any      `json:"static_value,omitempty"`
 }

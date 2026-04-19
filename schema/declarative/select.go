@@ -42,7 +42,7 @@ func MustParseSelect(selectExpr string) *Selection {
 }
 
 // FindNode returns the node matching the selector name.
-func (g *GraphBlueprint) FindNode(name string) (*NodeSpec, bool) {
+func (g *GraphSpec) FindNode(name string) (*NodeSpec, bool) {
 	for i := range g.Nodes {
 		if g.Nodes[i].Key == name {
 			return &g.Nodes[i], true

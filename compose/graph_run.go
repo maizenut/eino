@@ -26,7 +26,6 @@ import (
 	"github.com/cloudwego/eino/components/interceptor"
 	"github.com/cloudwego/eino/internal"
 	"github.com/cloudwego/eino/internal/core"
-	"github.com/cloudwego/eino/internal/serialization"
 )
 
 type chanCall struct {
@@ -447,18 +446,20 @@ func (r *runner) restoreCheckPointState(
 	if err != nil {
 		return ctx, newGraphRunError(err)
 	}
-	if sm != nil && cp.State != nil {
-		err = sm(ctx, path, cp.State)
-		if err != nil {
-			return ctx, newGraphRunError(fmt.Errorf("state modifier fail: %w", err))
-		}
-	}
 	if cp.State != nil {
 		isResumeTarget, hasData, data := GetResumeContext[any](ctx)
 		if isResumeTarget && hasData {
 			cp.State = data
 		}
-
+	}
+	if sm != nil && cp.State != nil {
+		mCtx := withStateModifierPhase(ctx, StateModifierPhaseRestore)
+		err = sm(mCtx, path, cp.State)
+		if err != nil {
+			return ctx, newGraphRunError(fmt.Errorf("state modifier restore fail: %w", err))
+		}
+	}
+	if cp.State != nil {
 		var parent *internalState
 		if prev := ctx.Value(stateKey{}); prev != nil {
 			if p, ok := prev.(*internalState); ok {
@@ -576,10 +577,16 @@ func (r *runner) handleInterrupt(
 		// current graph has enable state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
-			copiedState, err := deepCopyState(state.state)
+			copiedState, err := deepCopyState(state.state, r.checkPointer.serializer)
 			state.mu.Unlock()
 			if err != nil {
 				return fmt.Errorf("failed to copy state: %w", err)
+			}
+			if sm := getStateModifier(ctx); sm != nil && copiedState != nil {
+				mCtx := withStateModifierPhase(ctx, StateModifierPhasePersist)
+				if err := sm(mCtx, NodePath{}, copiedState); err != nil {
+					return fmt.Errorf("state modifier persist fail: %w", err)
+				}
 			}
 			cp.State = copiedState
 		}
@@ -628,12 +635,11 @@ func (r *runner) handleInterrupt(
 	return &interruptError{Info: intInfo}
 }
 
-// deepCopyState creates a deep copy of the state using serialization
-func deepCopyState(state any) (any, error) {
+// deepCopyState creates a deep copy of the state using serialization.
+func deepCopyState(state any, serializer Serializer) (any, error) {
 	if state == nil {
 		return nil, nil
 	}
-	serializer := &serialization.InternalSerializer{}
 	data, err := serializer.Marshal(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal state: %w", err)
@@ -709,10 +715,16 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 		// current graph has enable state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
-			copiedState, err_ := deepCopyState(state.state)
+			copiedState, err_ := deepCopyState(state.state, r.checkPointer.serializer)
 			state.mu.Unlock()
 			if err_ != nil {
 				return fmt.Errorf("failed to copy state: %w", err_)
+			}
+			if sm := getStateModifier(ctx); sm != nil && copiedState != nil {
+				mCtx := withStateModifierPhase(ctx, StateModifierPhasePersist)
+				if err := sm(mCtx, NodePath{}, copiedState); err != nil {
+					return fmt.Errorf("state modifier persist fail: %w", err)
+				}
 			}
 			cp.State = copiedState
 		}

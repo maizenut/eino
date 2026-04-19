@@ -3,7 +3,8 @@ package declarative
 import "github.com/cloudwego/eino/components"
 
 const (
-	RefKindBlueprintDocument    = "blueprint_document"
+	RefKindGraphDocument        = "graph_document"
+	RefKindBlueprintDocument    = RefKindGraphDocument
 	RefKindComponentDocument    = "component_document"
 	RefKindSkillDocument        = "skill_document"
 	RefKindInterpreterFunction  = "interpreter_function"
@@ -16,6 +17,11 @@ const (
 	GraphTypeGraph              = "graph"
 	GraphTypeChain              = "chain"
 	GraphTypeWorkflow           = "workflow"
+	EdgeKindData                = "data"
+	EdgeKindControl             = "control"
+	EdgeKindRoute               = "route"
+	EdgeKindNoData              = "no_data"
+	EdgeKindNoControl           = "no_control"
 	SelectPrefixNode            = "node:"
 	SelectPrefixGraph           = "graph:"
 	SelectPrefixComponent       = "component:"
@@ -39,6 +45,11 @@ type ComponentSpec struct {
 	Extra  map[string]any `json:"extra,omitempty"`
 }
 
+// ComponentRef declares a node-level reference to an external component spec.
+type ComponentRef struct {
+	Ref Ref `json:"ref"`
+}
+
 // LambdaSpec declares a callable node that maps to compose.Lambda.
 type LambdaSpec struct {
 	Impl       string         `json:"impl"`
@@ -53,7 +64,7 @@ type NodeSpec struct {
 	Key       string         `json:"key"`
 	Name      string         `json:"name,omitempty"`
 	Kind      string         `json:"kind"`
-	Component *ComponentSpec `json:"component,omitempty"`
+	Component *ComponentRef  `json:"component,omitempty"`
 	Lambda    *LambdaSpec    `json:"lambda,omitempty"`
 	GraphRef  *Ref           `json:"graph_ref,omitempty"`
 	InputKey  string         `json:"input_key,omitempty"`
@@ -61,33 +72,31 @@ type NodeSpec struct {
 	Options   map[string]any `json:"options,omitempty"`
 }
 
-// GraphEdgeBlueprint declares a simple directed edge.
-type GraphEdgeBlueprint struct {
-	From     string             `json:"from"`
-	To       string             `json:"to"`
-	Control  *bool              `json:"control,omitempty"`
-	Data     *bool              `json:"data,omitempty"`
-	Mode     *GraphEdgeMode     `json:"mode,omitempty"`
-	Mappings []FieldMappingSpec `json:"mappings,omitempty"`
+// EdgeSpec declares a simple directed edge.
+type EdgeSpec struct {
+	From      string             `json:"from"`
+	To        string             `json:"to"`
+	Kind      string             `json:"kind,omitempty"`
+	Mappings  []FieldMappingSpec `json:"mappings,omitempty"`
+	Condition *Ref               `json:"condition,omitempty"`
+	Match     string             `json:"match,omitempty"`
+	Default   bool               `json:"default,omitempty"`
+	Options   map[string]any     `json:"options,omitempty"`
 }
 
-// GraphBranchBlueprint declares a branch route from one node to many end nodes.
-type GraphBranchBlueprint struct {
-	From      string   `json:"from"`
-	Condition Ref      `json:"condition"`
-	EndNodes  []string `json:"end_nodes,omitempty"`
+// GraphSpec declares a graph, chain, or workflow.
+type GraphSpec struct {
+	Name          string             `json:"name,omitempty"`
+	Type          string             `json:"type,omitempty"`
+	Nodes         []NodeSpec         `json:"nodes,omitempty"`
+	Edges         []EdgeSpec         `json:"edges,omitempty"`
+	WorkflowNodes []WorkflowNodeSpec `json:"workflow_nodes,omitempty"`
+	Options       map[string]any     `json:"options,omitempty"`
 }
 
-// GraphBlueprint declares a graph, chain, or workflow.
-type GraphBlueprint struct {
-	Name          string                  `json:"name,omitempty"`
-	Type          string                  `json:"type,omitempty"`
-	Nodes         []NodeSpec              `json:"nodes,omitempty"`
-	Edges         []GraphEdgeBlueprint    `json:"edges,omitempty"`
-	Branches      []GraphBranchBlueprint  `json:"branches,omitempty"`
-	WorkflowNodes []WorkflowNodeBlueprint `json:"workflow_nodes,omitempty"`
-	Options       map[string]any          `json:"options,omitempty"`
-}
+// GraphBlueprint is kept as a compatibility alias while the codebase converges
+// on GraphSpec terminology.
+type GraphBlueprint = GraphSpec
 
 // ComponentKind normalizes a spec kind into a components.Component value.
 func ComponentKind(kind string) components.Component {

@@ -96,6 +96,24 @@ func WithForceNewRun() Option {
 // StateModifier modifies state during checkpoint operations for a given node path.
 type StateModifier func(ctx context.Context, path NodePath, state any) error
 
+type StateModifierPhase string
+
+const (
+	StateModifierPhaseRestore StateModifierPhase = "restore"
+	StateModifierPhasePersist StateModifierPhase = "persist"
+)
+
+type stateModifierPhaseKey struct{}
+
+func withStateModifierPhase(ctx context.Context, phase StateModifierPhase) context.Context {
+	return context.WithValue(ctx, stateModifierPhaseKey{}, phase)
+}
+
+func GetStateModifierPhase(ctx context.Context) (StateModifierPhase, bool) {
+	v, ok := ctx.Value(stateModifierPhaseKey{}).(StateModifierPhase)
+	return v, ok
+}
+
 // WithStateModifier installs a state modifier invoked during checkpoint read/write.
 func WithStateModifier(sm StateModifier) Option {
 	return Option{
