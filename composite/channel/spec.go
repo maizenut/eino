@@ -2,6 +2,7 @@ package channel
 
 import (
 	"fmt"
+	"time"
 
 	declarative "github.com/cloudwego/eino/schema/declarative"
 )
@@ -18,9 +19,9 @@ type Info struct {
 
 // RetryPolicy describes reconnect behavior for a channel endpoint.
 type RetryPolicy struct {
-	MaxAttempts int    `json:"max_attempts,omitempty"`
-	BackoffMS   int64  `json:"backoff_ms,omitempty"`
-	Strategy    string `json:"strategy,omitempty"` // fixed, linear, exponential
+	MaxAttempts int           `json:"max_attempts,omitempty"`
+	Backoff     time.Duration `json:"backoff,omitempty"`
+	Strategy    string        `json:"strategy,omitempty"` // fixed, linear, exponential
 }
 
 // EndpointSpec describes the transport connection for a channel.
