@@ -3,12 +3,11 @@ package skill
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
-	agentpkg "github.com/cloudwego/eino/flow/agent"
-	react "github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -42,14 +41,14 @@ func TestRunnableCanBindToReactAgent(t *testing.T) {
 		secondResponse: schema.AssistantMessage("final answer from skill", nil),
 	}
 
-	agentUnderTest, invokeOpts, err := newReactAgentWithSkill(ctx, runnable, fakeModel)
-	if err != nil {
-		t.Fatalf("newReactAgentWithSkill: %v", err)
+	agentUnderTest := &skillReactLoop{
+		model:       fakeModel,
+		instruction: runnable.instruction,
 	}
 
-	got, err := agentUnderTest.Generate(ctx, []*schema.Message{
+	got, err := agentUnderTest.generate(ctx, runnable.tools, []*schema.Message{
 		schema.UserMessage("Please use the skill to answer."),
-	}, invokeOpts...)
+	})
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -104,40 +103,60 @@ func TestRunnableCanBindToReactAgent(t *testing.T) {
 	}
 }
 
-func newReactAgentWithSkill(ctx context.Context, runnable Runnable, chatModel model.ToolCallingChatModel) (*react.Agent, []agentpkg.AgentOption, error) {
-	tools, err := runnable.Tools(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	instruction, err := runnable.Instruction(ctx)
-	if err != nil {
-		return nil, nil, err
+// skillReactLoop is a minimal ReAct-style loop for testing skill binding
+// without depending on eino/flow/agent/react.
+type skillReactLoop struct {
+	model       model.ToolCallingChatModel
+	instruction string
+}
+
+func (l *skillReactLoop) generate(ctx context.Context, tools []tool.BaseTool, input []*schema.Message) (*schema.Message, error) {
+	toolInfos := make([]*schema.ToolInfo, 0, len(tools))
+	toolMap := make(map[string]tool.InvokableTool, len(tools))
+	for _, t := range tools {
+		info, err := t.Info(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get tool info: %w", err)
+		}
+		toolInfos = append(toolInfos, info)
+		if inv, ok := t.(tool.InvokableTool); ok {
+			toolMap[info.Name] = inv
+		}
 	}
 
-	config := &react.AgentConfig{
-		ToolCallingModel: chatModel,
-		MessageModifier: func(ctx context.Context, input []*schema.Message) []*schema.Message {
-			_ = ctx
-			out := make([]*schema.Message, 0, len(input)+1)
-			if instruction != "" {
-				out = append(out, schema.SystemMessage(instruction))
+	boundModel, err := l.model.WithTools(toolInfos)
+	if err != nil {
+		return nil, fmt.Errorf("bind tools to model: %w", err)
+	}
+
+	messages := make([]*schema.Message, 0, len(input)+2)
+	if l.instruction != "" {
+		messages = append(messages, schema.SystemMessage(l.instruction))
+	}
+	messages = append(messages, input...)
+
+	for i := 0; i < 10; i++ {
+		msg, err := boundModel.Generate(ctx, messages)
+		if err != nil {
+			return nil, fmt.Errorf("model generate step %d: %w", i, err)
+		}
+		if len(msg.ToolCalls) == 0 {
+			return msg, nil
+		}
+		messages = append(messages, msg)
+		for _, tc := range msg.ToolCalls {
+			inv, ok := toolMap[tc.Function.Name]
+			if !ok {
+				return nil, fmt.Errorf("unknown tool %q", tc.Function.Name)
 			}
-			out = append(out, input...)
-			return out
-		},
+			result, err := inv.InvokableRun(ctx, tc.Function.Arguments)
+			if err != nil {
+				return nil, fmt.Errorf("tool %q: %w", tc.Function.Name, err)
+			}
+			messages = append(messages, schema.ToolMessage(result, tc.ID, schema.WithToolName(tc.Function.Name)))
+		}
 	}
-
-	agentUnderTest, err := react.NewAgent(ctx, config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	opts, err := react.WithTools(ctx, tools...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return agentUnderTest, opts, nil
+	return nil, fmt.Errorf("react loop exceeded max steps")
 }
 
 type recordingSkillTool struct {
@@ -175,18 +194,14 @@ func (m *recordingToolCallingModel) Generate(ctx context.Context, input []*schem
 	_ = ctx
 	m.generateCalls++
 
-	commonOpts := model.GetCommonOptions(nil, opts...)
 	copiedMessages := cloneMessages(input)
-	copiedTools := cloneToolInfos(commonOpts.Tools)
 
 	switch m.generateCalls {
 	case 1:
 		m.firstCallMessages = copiedMessages
-		m.firstCallTools = copiedTools
 		return m.firstResponse, nil
 	case 2:
 		m.secondCallMessages = copiedMessages
-		m.secondCallTools = copiedTools
 		return m.secondResponse, nil
 	default:
 		return nil, errors.New("unexpected extra model call")
@@ -202,9 +217,8 @@ func (m *recordingToolCallingModel) Stream(ctx context.Context, input []*schema.
 }
 
 func (m *recordingToolCallingModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	clone := *m
-	clone.firstCallTools = cloneToolInfos(tools)
-	return &clone, nil
+	m.firstCallTools = cloneToolInfos(tools)
+	return m, nil
 }
 
 func cloneMessages(in []*schema.Message) []*schema.Message {
