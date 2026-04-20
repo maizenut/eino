@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/retriever"
+	composeinterceptor "github.com/cloudwego/eino/compose/interceptor"
 )
 
 type graphCancelChanKey struct{}
@@ -100,8 +101,10 @@ type Option struct {
 
 	paths []*NodePath
 
-	nodeInterceptors      []NodeInterceptor
-	nodeInterceptorByPath map[string][]NodeInterceptor
+	nodeInterceptors         []NodeInterceptor
+	nodeInterceptorByPath    map[string][]NodeInterceptor
+	interceptorOrderStrategy composeinterceptor.OrderStrategy
+	interceptorOrderNames    []string
 
 	maxRunSteps         int
 	checkPointID        *string
@@ -278,6 +281,23 @@ func WithRuntimeMaxSteps(maxSteps int) Option {
 	}
 }
 
+// WithCallInterceptorOrderStrategy sets the ordering strategy for node interceptors
+// at call time. This overrides the compile-time strategy for this specific call.
+func WithCallInterceptorOrderStrategy(strategy composeinterceptor.OrderStrategy) Option {
+	return Option{
+		interceptorOrderStrategy: strategy,
+	}
+}
+
+// WithCallInterceptorOrderNames sets explicit interceptor ordering by name at call time.
+// This is used with the OrderByNames strategy. It overrides the compile-time names for
+// this specific call.
+func WithCallInterceptorOrderNames(names ...string) Option {
+	return Option{
+		interceptorOrderNames: names,
+	}
+}
+
 func withComponentOption[TOption any](opts ...TOption) Option {
 	o := make([]any, 0, len(opts))
 	for i := range opts {
@@ -297,12 +317,12 @@ func (o *Option) getNodeInterceptors(nodeKey string) []NodeInterceptor {
 	interceptors := make([]NodeInterceptor, 0, len(o.nodeInterceptors))
 	interceptors = append(interceptors, o.nodeInterceptors...)
 	if len(o.nodeInterceptorByPath) == 0 {
-		return interceptors
+		return composeinterceptor.Sort(interceptors, o.interceptorOrderStrategy, o.interceptorOrderNames)
 	}
 	if scoped, ok := o.nodeInterceptorByPath[nodePathKey(NewNodePath(nodeKey))]; ok {
 		interceptors = append(interceptors, scoped...)
 	}
-	return interceptors
+	return composeinterceptor.Sort(interceptors, o.interceptorOrderStrategy, o.interceptorOrderNames)
 }
 
 func nodePathKey(path *NodePath) string {

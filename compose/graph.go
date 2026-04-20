@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/retriever"
+	composeinterceptor "github.com/cloudwego/eino/compose/interceptor"
 	"github.com/cloudwego/eino/internal/generic"
 	"github.com/cloudwego/eino/internal/gmap"
 )
@@ -743,7 +744,7 @@ func (g *graph) compile(ctx context.Context, opt *graphCompileOptions) (*composa
 
 			preProcessor:  node.nodeInfo.preProcessor,
 			postProcessor: node.nodeInfo.postProcessor,
-			interceptors:  opt.nodeInterceptors,
+			interceptors:  composeinterceptor.Sort(opt.nodeInterceptors, opt.interceptorOrderStrategy, opt.interceptorOrderNames),
 			info: NodeInfo{
 				Key:               name,
 				Name:              node.nodeInfo.name,

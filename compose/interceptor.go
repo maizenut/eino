@@ -29,3 +29,21 @@ type NodeExecutor = composeinterceptor.NodeExecutor
 
 // NodeInfo aliases runtime node execution metadata.
 type NodeInfo = composeinterceptor.NodeInfo
+
+// PriorityAware aliases the optional interface for declaring interceptor priority.
+type PriorityAware = composeinterceptor.PriorityAware
+
+// NamedInterceptor aliases the optional interface for declaring interceptor name.
+type NamedInterceptor = composeinterceptor.NamedInterceptor
+
+// OrderStrategy aliases the interceptor ordering strategy type.
+type OrderStrategy = composeinterceptor.OrderStrategy
+
+const (
+	OrderByInsertion OrderStrategy = composeinterceptor.OrderByInsertion
+	OrderByPriority  OrderStrategy = composeinterceptor.OrderByPriority
+	OrderByNames     OrderStrategy = composeinterceptor.OrderByNames
+)
+
+// SortInterceptors aliases the interceptor sorting function.
+var SortInterceptors = composeinterceptor.Sort

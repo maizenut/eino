@@ -16,6 +16,8 @@
 
 package compose
 
+import composeinterceptor "github.com/cloudwego/eino/compose/interceptor"
+
 type graphCompileOptions struct {
 	maxRunSteps     int
 	graphName       string
@@ -25,12 +27,14 @@ type graphCompileOptions struct {
 
 	origOpts []GraphCompileOption
 
-	checkPointStore      CheckPointStore
-	serializer           Serializer
-	interruptBeforeNodes []string
-	interruptAfterNodes  []string
-	nodeInterceptors     []NodeInterceptor
-	memoryOptions        *MemoryOptions
+	checkPointStore          CheckPointStore
+	serializer               Serializer
+	interruptBeforeNodes     []string
+	interruptAfterNodes      []string
+	nodeInterceptors         []NodeInterceptor
+	interceptorOrderStrategy composeinterceptor.OrderStrategy
+	interceptorOrderNames    []string
+	memoryOptions            *MemoryOptions
 
 	eagerDisabled bool
 
@@ -131,6 +135,27 @@ func WithFanInMergeConfig(confs map[string]FanInMergeConfig) GraphCompileOption 
 // which ONLY will be added to top level graph compile options
 func InitGraphCompileCallbacks(cbs []GraphCompileCallback) {
 	globalGraphCompileCallbacks = cbs
+}
+
+// WithInterceptorOrderStrategy sets the ordering strategy for node interceptors
+// at compile time. The default is OrderByInsertion (backward compatible).
+//
+// Use OrderByPriority to sort interceptors by their Priority() value (lower first),
+// or OrderByNames to sort by an explicit name list provided via WithInterceptorOrderNames.
+func WithInterceptorOrderStrategy(strategy composeinterceptor.OrderStrategy) GraphCompileOption {
+	return func(o *graphCompileOptions) {
+		o.interceptorOrderStrategy = strategy
+	}
+}
+
+// WithInterceptorOrderNames sets explicit interceptor ordering by name at compile time.
+// This is used with the OrderByNames strategy. Named interceptors are placed in the
+// order their names appear in this list. Interceptors that don't implement NamedInterceptor
+// or whose names aren't in the list are placed after all named ones.
+func WithInterceptorOrderNames(names ...string) GraphCompileOption {
+	return func(o *graphCompileOptions) {
+		o.interceptorOrderNames = names
+	}
 }
 
 var globalGraphCompileCallbacks []GraphCompileCallback
