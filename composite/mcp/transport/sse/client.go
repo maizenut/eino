@@ -150,6 +150,7 @@ func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg
 			Name        string         `json:"name"`
 			Description string         `json:"description,omitempty"`
 			Metadata    map[string]any `json:"metadata,omitempty"`
+			InputSchema json.RawMessage `json:"inputSchema,omitempty"`
 		} `json:"tools"`
 	}
 	if err := c.call(ctx, "tools/list", nil, &result, opts...); err != nil {
@@ -161,6 +162,7 @@ func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg
 			Name:        item.Name,
 			Description: item.Description,
 			Metadata:    cloneAnyMap(item.Metadata),
+			InputSchema: append(json.RawMessage(nil), item.InputSchema...),
 		})
 	}
 	return tools, nil

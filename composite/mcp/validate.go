@@ -9,6 +9,8 @@ const (
 	TransportHTTP = "http"
 	// TransportSSE keeps an SSE stream open and sends requests over HTTP.
 	TransportSSE = "sse"
+	// TransportWebSocket sends JSON-RPC requests over WebSocket.
+	TransportWebSocket = "websocket"
 )
 
 // Validate checks whether the server spec has the required transport fields.
@@ -24,7 +26,7 @@ func (s ServerSpec) Validate() error {
 		if s.Command == "" {
 			return fmt.Errorf("mcp stdio command is required")
 		}
-	case TransportHTTP, TransportSSE:
+	case TransportHTTP, TransportSSE, TransportWebSocket:
 		if s.URL == "" {
 			return fmt.Errorf("mcp %s url is required", s.Transport)
 		}

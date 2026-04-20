@@ -47,7 +47,7 @@ func TestServerSpecValidate_Stdio(t *testing.T) {
 }
 
 func TestServerSpecValidate_UnsupportedTransport(t *testing.T) {
-	spec := mcppkg.ServerSpec{Name: "codebase", Transport: "websocket", URL: "http://example.com"}
+	spec := mcppkg.ServerSpec{Name: "codebase", Transport: "grpc", URL: "http://example.com"}
 	if err := spec.Validate(); err == nil {
 		t.Fatalf("Validate error = nil, want error")
 	}

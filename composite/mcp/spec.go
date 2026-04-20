@@ -1,6 +1,10 @@
 package mcp
 
-import declarative "github.com/cloudwego/eino/schema/declarative"
+import (
+	"encoding/json"
+
+	declarative "github.com/cloudwego/eino/schema/declarative"
+)
 
 // ServerSpec describes how an MCP server is connected and bridged into Eino.
 type ServerSpec struct {
@@ -37,6 +41,9 @@ type ToolDescriptor struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
+	// InputSchema carries the JSON Schema describing tool arguments if the MCP server provides it.
+	// This mirrors MCP's `inputSchema` field and is bridged into schema.ToolInfo.ParamsOneOf.
+	InputSchema json.RawMessage `json:"inputSchema,omitempty"`
 }
 
 // ResourceDescriptor describes a remote MCP resource.

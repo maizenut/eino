@@ -1,16 +1,16 @@
-package http
+package websocket
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	nethttp "net/http"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	mcppkg "github.com/cloudwego/eino/composite/mcp"
 )
@@ -34,40 +34,39 @@ type responseError struct {
 	Message string `json:"message"`
 }
 
-// Doer sends HTTP requests for the MCP HTTP transport.
-type Doer interface {
-	Do(req *nethttp.Request) (*nethttp.Response, error)
-}
-
-// Client is a lightweight HTTP MCP client.
+// Client is a lightweight WebSocket MCP client.
+//
+// It assumes one JSON-RPC request yields one JSON-RPC response message on the same WebSocket.
+// Server push / notifications are ignored.
 type Client struct {
-	doer Doer
+	dialer *websocket.Dialer
 
 	mu         sync.Mutex
 	spec       *mcppkg.ServerSpec
 	serverInfo *mcppkg.ServerInfo
+	conn       *websocket.Conn
 	connected  bool
 	nextID     atomic.Int64
 }
 
-// NewClient creates an HTTP MCP client.
-func NewClient(doer Doer) *Client {
-	if doer == nil {
-		doer = &nethttp.Client{}
+// NewClient creates a WebSocket MCP client.
+func NewClient(dialer *websocket.Dialer) *Client {
+	if dialer == nil {
+		dialer = websocket.DefaultDialer
 	}
-	return &Client{doer: doer}
+	return &Client{dialer: dialer}
 }
 
-// Connect validates the server spec and performs MCP initialize over HTTP.
+// Connect dials the WebSocket endpoint and performs MCP initialize.
 func (c *Client) Connect(ctx context.Context, spec mcppkg.ServerSpec, opts ...mcppkg.Option) error {
 	debugLogf("connect begin: server=%s transport=%s url=%s", spec.Name, spec.Transport, spec.URL)
 	if err := spec.Validate(); err != nil {
 		debugLogf("connect validate failed: server=%s err=%v", spec.Name, err)
 		return err
 	}
-	if spec.Transport != mcppkg.TransportHTTP {
+	if spec.Transport != mcppkg.TransportWebSocket {
 		debugLogf("connect unsupported transport: server=%s transport=%s", spec.Name, spec.Transport)
-		return fmt.Errorf("http client only supports transport %s", mcppkg.TransportHTTP)
+		return fmt.Errorf("websocket client only supports transport %s", mcppkg.TransportWebSocket)
 	}
 
 	c.mu.Lock()
@@ -78,8 +77,21 @@ func (c *Client) Connect(ctx context.Context, spec mcppkg.ServerSpec, opts ...mc
 	}
 	c.mu.Unlock()
 
-	serverInfo, err := initializeSession(ctx, c.doer, spec, opts...)
+	header := http.Header{}
+	for k, v := range spec.Headers {
+		header.Set(k, v)
+	}
+
+	// websocket.DialContext honours ctx cancellation for the dial.
+	conn, _, err := c.dialer.DialContext(ctx, spec.URL, header)
 	if err != nil {
+		debugLogf("connect dial failed: server=%s err=%v", spec.Name, err)
+		return fmt.Errorf("dial websocket %s: %w", spec.URL, err)
+	}
+
+	serverInfo, err := initializeSession(ctx, conn, spec, opts...)
+	if err != nil {
+		_ = conn.Close()
 		debugLogf("connect initialize failed: server=%s err=%v", spec.Name, err)
 		return err
 	}
@@ -89,23 +101,30 @@ func (c *Client) Connect(ctx context.Context, spec mcppkg.ServerSpec, opts ...mc
 	cloned := spec
 	c.spec = &cloned
 	c.serverInfo = serverInfo
+	c.conn = conn
 	c.connected = true
 	debugLogf("connect success: server=%s remote_name=%s version=%s capabilities=%v", spec.Name, serverInfo.Name, serverInfo.Version, serverInfo.Capabilities)
 	return nil
 }
 
-// Disconnect clears in-memory connection state.
+// Disconnect closes the WebSocket connection and clears state.
 func (c *Client) Disconnect(ctx context.Context) error {
 	_ = ctx
 	c.mu.Lock()
+	conn := c.conn
 	serverName := ""
 	if c.spec != nil {
 		serverName = c.spec.Name
 	}
 	c.spec = nil
 	c.serverInfo = nil
+	c.conn = nil
 	c.connected = false
 	c.mu.Unlock()
+
+	if conn != nil {
+		_ = conn.Close()
+	}
 	debugLogf("disconnect success: server=%s", serverName)
 	return nil
 }
@@ -116,7 +135,7 @@ func (c *Client) Info(ctx context.Context) (*mcppkg.ServerInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.spec == nil {
-		return nil, fmt.Errorf("mcp http client is not connected")
+		return nil, fmt.Errorf("mcp websocket client is not connected")
 	}
 	if c.serverInfo != nil {
 		return cloneServerInfo(c.serverInfo), nil
@@ -124,13 +143,12 @@ func (c *Client) Info(ctx context.Context) (*mcppkg.ServerInfo, error) {
 	return &mcppkg.ServerInfo{Name: c.spec.Name, Metadata: cloneAnyMap(c.spec.Metadata)}, nil
 }
 
-// ListTools fetches remote tool descriptors.
 func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg.ToolDescriptor, error) {
 	var result struct {
 		Tools []struct {
-			Name        string         `json:"name"`
-			Description string         `json:"description,omitempty"`
-			Metadata    map[string]any `json:"metadata,omitempty"`
+			Name        string          `json:"name"`
+			Description string          `json:"description,omitempty"`
+			Metadata    map[string]any  `json:"metadata,omitempty"`
 			InputSchema json.RawMessage `json:"inputSchema,omitempty"`
 		} `json:"tools"`
 	}
@@ -149,7 +167,6 @@ func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg
 	return tools, nil
 }
 
-// CallTool sends a tools/call request over HTTP.
 func (c *Client) CallTool(ctx context.Context, name string, args map[string]any, opts ...mcppkg.Option) (any, error) {
 	var result map[string]any
 	if err := c.call(ctx, "tools/call", map[string]any{"name": name, "arguments": args}, &result, opts...); err != nil {
@@ -158,7 +175,6 @@ func (c *Client) CallTool(ctx context.Context, name string, args map[string]any,
 	return result, nil
 }
 
-// ListResources fetches remote resource descriptors.
 func (c *Client) ListResources(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg.ResourceDescriptor, error) {
 	var result struct {
 		Resources []struct {
@@ -185,7 +201,6 @@ func (c *Client) ListResources(ctx context.Context, opts ...mcppkg.Option) ([]mc
 	return resources, nil
 }
 
-// ReadResource sends a resources/read request over HTTP.
 func (c *Client) ReadResource(ctx context.Context, uri string, opts ...mcppkg.Option) (any, error) {
 	var result map[string]any
 	if err := c.call(ctx, "resources/read", map[string]any{"uri": uri}, &result, opts...); err != nil {
@@ -194,7 +209,6 @@ func (c *Client) ReadResource(ctx context.Context, uri string, opts ...mcppkg.Op
 	return result, nil
 }
 
-// ListPrompts fetches remote prompt descriptors.
 func (c *Client) ListPrompts(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg.PromptDescriptor, error) {
 	var result struct {
 		Prompts []struct {
@@ -219,7 +233,6 @@ func (c *Client) ListPrompts(ctx context.Context, opts ...mcppkg.Option) ([]mcpp
 	return prompts, nil
 }
 
-// GetPrompt sends a prompts/get request over HTTP.
 func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]any, opts ...mcppkg.Option) (string, error) {
 	var result struct {
 		Prompt string `json:"prompt"`
@@ -234,23 +247,65 @@ func (c *Client) call(ctx context.Context, method string, params map[string]any,
 	_ = opts
 
 	c.mu.Lock()
-	spec := c.spec
-	connected := c.connected
-	c.mu.Unlock()
-	if !connected || spec == nil {
-		debugLogf("call rejected: method=%s connected=%v spec_nil=%v", method, connected, spec == nil)
-		return fmt.Errorf("mcp http client is not connected")
+	defer c.mu.Unlock()
+
+	if !c.connected || c.spec == nil || c.conn == nil {
+		debugLogf("call rejected: method=%s connected=%v spec_nil=%v conn_nil=%v", method, c.connected, c.spec == nil, c.conn == nil)
+		return fmt.Errorf("mcp websocket client is not connected")
 	}
 
 	id := c.nextID.Add(1)
-	debugLogf("call dispatch: server=%s method=%s id=%d params=%v", spec.Name, method, id, params)
-	return callHTTP(ctx, c.doer, *spec, id, method, params, out)
+	debugLogf("call dispatch: server=%s method=%s id=%d params=%v", c.spec.Name, method, id, params)
+
+	// Apply deadline if present to bound read/write for this call.
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = c.conn.SetWriteDeadline(deadline)
+		_ = c.conn.SetReadDeadline(deadline)
+	} else {
+		_ = c.conn.SetWriteDeadline(time.Time{})
+		_ = c.conn.SetReadDeadline(time.Time{})
+	}
+
+	reqBody := request{JSONRPC: "2.0", ID: id, Method: method, Params: params}
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal mcp request %s: %w", method, err)
+	}
+	if err := c.conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+		return fmt.Errorf("write mcp request %s: %w", method, err)
+	}
+
+	for {
+		_, msg, err := c.conn.ReadMessage()
+		if err != nil {
+			// Surface ctx timeout/cancel as-is when possible.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("read mcp response %s: %w", method, err)
+		}
+		var resp response
+		if err := json.Unmarshal(msg, &resp); err != nil {
+			return fmt.Errorf("decode mcp response %s: %w", method, err)
+		}
+		if resp.ID != id {
+			continue
+		}
+		if resp.Error != nil {
+			return fmt.Errorf("mcp %s failed: %s", method, resp.Error.Message)
+		}
+		if out == nil || len(resp.Result) == 0 {
+			return nil
+		}
+		if err := json.Unmarshal(resp.Result, out); err != nil {
+			return fmt.Errorf("decode mcp result %s: %w", method, err)
+		}
+		return nil
+	}
 }
 
-func initializeSession(ctx context.Context, doer Doer, spec mcppkg.ServerSpec, opts ...mcppkg.Option) (*mcppkg.ServerInfo, error) {
+func initializeSession(ctx context.Context, conn *websocket.Conn, spec mcppkg.ServerSpec, opts ...mcppkg.Option) (*mcppkg.ServerInfo, error) {
 	_ = opts
-	start := time.Now()
-
 	var result struct {
 		ServerInfo struct {
 			Name    string `json:"name"`
@@ -262,14 +317,15 @@ func initializeSession(ctx context.Context, doer Doer, spec mcppkg.ServerSpec, o
 	params := map[string]any{
 		"protocolVersion": "2024-11-05",
 		"clientInfo": map[string]any{
-			"name":    "eino-mcp-http",
+			"name":    "eino-mcp-websocket",
 			"version": "0.1.0",
 		},
 		"capabilities": map[string]any{},
 	}
-	debugLogf("initialize begin: server=%s url=%s deadline=%s headers=%v params=%v", spec.Name, spec.URL, contextDeadlineString(ctx), headerKeys(spec.Headers), params)
-	if err := callHTTP(ctx, doer, spec, 1, "initialize", params, &result); err != nil {
-		debugLogf("initialize failed: server=%s url=%s elapsed=%s err=%v", spec.Name, spec.URL, time.Since(start), err)
+	tmp := &Client{dialer: websocket.DefaultDialer, spec: &spec, conn: conn, connected: true}
+	// Force initialize id to 1 to match other transports.
+	tmp.nextID.Store(0)
+	if err := tmp.call(ctx, "initialize", params, &result); err != nil {
 		return nil, err
 	}
 	info := &mcppkg.ServerInfo{
@@ -289,70 +345,7 @@ func initializeSession(ctx context.Context, doer Doer, spec mcppkg.ServerSpec, o
 			info.Metadata[k] = v
 		}
 	}
-	debugLogf("initialize success: server=%s remote_name=%s version=%s capabilities=%v metadata=%v elapsed=%s", spec.Name, info.Name, info.Version, info.Capabilities, info.Metadata, time.Since(start))
 	return info, nil
-}
-
-func callHTTP(ctx context.Context, doer Doer, spec mcppkg.ServerSpec, id int64, method string, params map[string]any, out any) error {
-	start := time.Now()
-	reqBody := request{JSONRPC: "2.0", ID: id, Method: method, Params: params}
-	payload, err := json.Marshal(reqBody)
-	if err != nil {
-		debugLogf("marshal request failed: method=%s id=%d err=%v", method, id, err)
-		return fmt.Errorf("marshal mcp request %s: %w", method, err)
-	}
-	debugLogf("request build: server=%s method=%s id=%d url=%s deadline=%s header_keys=%v payload_bytes=%d payload=%s", spec.Name, method, id, spec.URL, contextDeadlineString(ctx), headerKeys(spec.Headers), len(payload), string(payload))
-
-	httpReq, err := nethttp.NewRequestWithContext(ctx, nethttp.MethodPost, spec.URL, bytes.NewReader(payload))
-	if err != nil {
-		debugLogf("request build failed: server=%s method=%s id=%d err=%v", spec.Name, method, id, err)
-		return fmt.Errorf("build http request %s: %w", method, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json")
-	for key, value := range spec.Headers {
-		httpReq.Header.Set(key, value)
-	}
-
-	debugLogf("request send: server=%s method=%s id=%d headers=%v", spec.Name, method, id, httpReq.Header)
-	httpResp, err := doer.Do(httpReq)
-	if err != nil {
-		debugLogf("request failed: server=%s method=%s id=%d elapsed=%s err=%v", spec.Name, method, id, time.Since(start), err)
-		return fmt.Errorf("send mcp request %s: %w", method, err)
-	}
-	defer httpResp.Body.Close()
-	debugLogf("response headers: server=%s method=%s id=%d status=%d elapsed=%s headers=%v", spec.Name, method, id, httpResp.StatusCode, time.Since(start), httpResp.Header)
-
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		debugLogf("response read failed: server=%s method=%s id=%d elapsed=%s err=%v", spec.Name, method, id, time.Since(start), err)
-		return fmt.Errorf("read mcp response %s: %w", method, err)
-	}
-	debugLogf("response read: server=%s method=%s id=%d status=%d elapsed=%s payload_bytes=%d payload=%s", spec.Name, method, id, httpResp.StatusCode, time.Since(start), len(body), string(body))
-	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		debugLogf("response status rejected: server=%s method=%s id=%d status=%d elapsed=%s", spec.Name, method, id, httpResp.StatusCode, time.Since(start))
-		return fmt.Errorf("mcp %s http status %d: %s", method, httpResp.StatusCode, string(body))
-	}
-
-	var resp response
-	if err := json.Unmarshal(body, &resp); err != nil {
-		debugLogf("response decode failed: server=%s method=%s id=%d elapsed=%s err=%v", spec.Name, method, id, time.Since(start), err)
-		return fmt.Errorf("decode mcp response %s: %w", method, err)
-	}
-	if resp.Error != nil {
-		debugLogf("response rpc error: server=%s method=%s id=%d elapsed=%s code=%d message=%s", spec.Name, method, id, time.Since(start), resp.Error.Code, resp.Error.Message)
-		return fmt.Errorf("mcp %s failed: %s", method, resp.Error.Message)
-	}
-	if out == nil || len(resp.Result) == 0 {
-		debugLogf("response empty result: server=%s method=%s id=%d elapsed=%s", spec.Name, method, id, time.Since(start))
-		return nil
-	}
-	if err := json.Unmarshal(resp.Result, out); err != nil {
-		debugLogf("result decode failed: server=%s method=%s id=%d elapsed=%s raw=%s err=%v", spec.Name, method, id, time.Since(start), string(resp.Result), err)
-		return fmt.Errorf("decode mcp result %s: %w", method, err)
-	}
-	debugLogf("result decode success: server=%s method=%s id=%d elapsed=%s result_bytes=%d", spec.Name, method, id, time.Since(start), len(resp.Result))
-	return nil
 }
 
 func cloneAnyMap(src map[string]any) map[string]any {
@@ -401,29 +394,7 @@ func cloneServerInfo(info *mcppkg.ServerInfo) *mcppkg.ServerInfo {
 }
 
 func debugLogf(format string, args ...any) {
-	log.Printf("[mcp/http] "+format, args...)
-}
-
-func contextDeadlineString(ctx context.Context) string {
-	if ctx == nil {
-		return "none"
-	}
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return "none"
-	}
-	return deadline.Format(time.RFC3339Nano)
-}
-
-func headerKeys(headers map[string]string) []string {
-	if len(headers) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(headers))
-	for key := range headers {
-		keys = append(keys, key)
-	}
-	return keys
+	log.Printf("[mcp/websocket] "+format, args...)
 }
 
 var _ mcppkg.Client = (*Client)(nil)

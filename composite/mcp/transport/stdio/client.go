@@ -219,6 +219,7 @@ func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg
 			Name        string         `json:"name"`
 			Description string         `json:"description,omitempty"`
 			Metadata    map[string]any `json:"metadata,omitempty"`
+			InputSchema json.RawMessage `json:"inputSchema,omitempty"`
 		} `json:"tools"`
 	}
 	if err := c.call(ctx, "tools/list", nil, &result, opts...); err != nil {
@@ -230,6 +231,7 @@ func (c *Client) ListTools(ctx context.Context, opts ...mcppkg.Option) ([]mcppkg
 			Name:        item.Name,
 			Description: item.Description,
 			Metadata:    cloneAnyMap(item.Metadata),
+			InputSchema: append(json.RawMessage(nil), item.InputSchema...),
 		})
 	}
 	return tools, nil
@@ -379,7 +381,6 @@ func initializeSession(ctx context.Context, stdin io.WriteCloser, reader *bufio.
 }
 
 func callWithPipes(ctx context.Context, stdin io.Writer, reader *bufio.Reader, id int64, method string, params map[string]any, out any, opts ...mcppkg.Option) error {
-	_ = ctx
 	resolvedOpts := applyClientOptions(opts)
 	_ = resolvedOpts
 
@@ -391,12 +392,12 @@ func callWithPipes(ctx context.Context, stdin io.Writer, reader *bufio.Reader, i
 	}
 	payload = append(payload, '\n')
 	debugLogf("request write: method=%s id=%d payload=%s", method, id, string(payload))
-	if _, writeErr := stdin.Write(payload); writeErr != nil {
+	if writeErr := writeWithContext(ctx, stdin, payload); writeErr != nil {
 		debugLogf("request write failed: method=%s id=%d err=%v", method, id, writeErr)
 		return fmt.Errorf("write mcp request %s: %w", method, writeErr)
 	}
 
-	line, err := reader.ReadBytes('\n')
+	line, err := readLineWithContext(ctx, reader)
 	if err != nil {
 		debugLogf("response read failed: method=%s id=%d err=%v", method, id, err)
 		return fmt.Errorf("read mcp response %s: %w", method, err)
@@ -421,6 +422,45 @@ func callWithPipes(ctx context.Context, stdin io.Writer, reader *bufio.Reader, i
 	}
 	debugLogf("result decode success: method=%s id=%d result=%s", method, id, string(resp.Result))
 	return nil
+}
+
+func writeWithContext(ctx context.Context, w io.Writer, payload []byte) error {
+	if ctx == nil {
+		_, err := w.Write(payload)
+		return err
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := w.Write(payload)
+		errCh <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-errCh:
+		return err
+	}
+}
+
+func readLineWithContext(ctx context.Context, r *bufio.Reader) ([]byte, error) {
+	if ctx == nil {
+		return r.ReadBytes('\n')
+	}
+	type readResult struct {
+		line []byte
+		err  error
+	}
+	ch := make(chan readResult, 1)
+	go func() {
+		line, err := r.ReadBytes('\n')
+		ch <- readResult{line: line, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		return res.line, res.err
+	}
 }
 
 func applyClientOptions(opts []mcppkg.Option) map[string]any {
