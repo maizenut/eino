@@ -111,6 +111,7 @@ type Option struct {
 	writeToCheckPointID *string
 	forceNewRun         bool
 	stateModifier       StateModifier
+	rerunFromNodes      []string
 }
 
 func (o Option) deepCopy() Option {
@@ -141,6 +142,7 @@ func (o Option) deepCopy() Option {
 		nodeInterceptors:      nInterceptors,
 		nodeInterceptorByPath: nInterceptorByPath,
 		maxRunSteps:           o.maxRunSteps,
+		rerunFromNodes:        append([]string(nil), o.rerunFromNodes...),
 	}
 }
 

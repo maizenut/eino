@@ -129,6 +129,11 @@ func (g *Graph[I, O]) Compile(ctx context.Context, opts ...GraphCompileOption) (
 	return compileAnyGraph[I, O](ctx, g, opts...)
 }
 
+// CompileAnyGraph compiles any AnyGraph into a typed Runnable.
+func CompileAnyGraph[I, O any](ctx context.Context, g AnyGraph, opts ...GraphCompileOption) (Runnable[I, O], error) {
+	return compileAnyGraph[I, O](ctx, g, opts...)
+}
+
 func compileAnyGraph[I, O any](ctx context.Context, g AnyGraph, opts ...GraphCompileOption) (Runnable[I, O], error) {
 	if len(globalGraphCompileCallbacks) > 0 {
 		opts = append([]GraphCompileOption{WithGraphCompileCallbacks(globalGraphCompileCallbacks...)}, opts...)

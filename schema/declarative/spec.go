@@ -59,17 +59,42 @@ type LambdaSpec struct {
 	Options    map[string]any `json:"options,omitempty"`
 }
 
+type BoundaryMode string
+
+const (
+	BoundaryModeInvoke    BoundaryMode = "invoke"
+	BoundaryModeDelegate  BoundaryMode = "delegate"
+	BoundaryModeSupervise BoundaryMode = "supervise"
+	BoundaryModeHandoff   BoundaryMode = "handoff"
+)
+
+type BoundaryPolicy struct {
+	Mode             BoundaryMode   `json:"mode,omitempty"`
+	ErrorPolicy      string         `json:"error_policy,omitempty"`
+	CheckpointPolicy string         `json:"checkpoint_policy,omitempty"`
+	ResumePolicy     string         `json:"resume_policy,omitempty"`
+	Timeout          string         `json:"timeout,omitempty"`
+	FallbackRef      *Ref           `json:"fallback_ref,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+}
+
+type BoundaryNodeSpec struct {
+	Enabled bool            `json:"enabled,omitempty"`
+	Policy  *BoundaryPolicy `json:"policy,omitempty"`
+}
+
 // NodeSpec declares a graph node.
 type NodeSpec struct {
-	Key       string         `json:"key"`
-	Name      string         `json:"name,omitempty"`
-	Kind      string         `json:"kind"`
-	Component *ComponentRef  `json:"component,omitempty"`
-	Lambda    *LambdaSpec    `json:"lambda,omitempty"`
-	GraphRef  *Ref           `json:"graph_ref,omitempty"`
-	InputKey  string         `json:"input_key,omitempty"`
-	OutputKey string         `json:"output_key,omitempty"`
-	Options   map[string]any `json:"options,omitempty"`
+	Key       string            `json:"key"`
+	Name      string            `json:"name,omitempty"`
+	Kind      string            `json:"kind"`
+	Component *ComponentRef     `json:"component,omitempty"`
+	Lambda    *LambdaSpec       `json:"lambda,omitempty"`
+	GraphRef  *Ref              `json:"graph_ref,omitempty"`
+	Boundary  *BoundaryNodeSpec `json:"boundary,omitempty"`
+	InputKey  string            `json:"input_key,omitempty"`
+	OutputKey string            `json:"output_key,omitempty"`
+	Options   map[string]any    `json:"options,omitempty"`
 }
 
 // EdgeSpec declares a simple directed edge.

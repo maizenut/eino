@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/internal/core"
 	"github.com/cloudwego/eino/internal/serialization"
@@ -91,6 +92,19 @@ func WithForceNewRun() Option {
 	return Option{
 		forceNewRun: true,
 	}
+}
+
+// WithResumeFromNodes overrides the checkpoint rerun node set during restore.
+func WithResumeFromNodes(nodes ...string) Option {
+	filtered := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		node = strings.TrimSpace(node)
+		if node == "" {
+			continue
+		}
+		filtered = append(filtered, node)
+	}
+	return Option{rerunFromNodes: filtered}
 }
 
 // StateModifier modifies state during checkpoint operations for a given node path.

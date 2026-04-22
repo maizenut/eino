@@ -155,7 +155,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	}
 
 	// Extract CheckPointID
-	checkPointID, writeToCheckPointID, stateModifier, forceNewRun := getCheckPointInfo(opts...)
+	checkPointID, writeToCheckPointID, stateModifier, forceNewRun, rerunFromNodes := getCheckPointInfo(opts...)
 	if checkPointID != nil && r.checkPointer.store == nil {
 		return nil, newGraphRunError(fmt.Errorf("receive checkpoint id but have not set checkpoint store"))
 	}
@@ -178,7 +178,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 		ctx, input = onGraphStart(ctx, input, isStream)
 		haveOnStart = true
 
-		nextTasks, err = r.restoreTasks(ctx, cp.Inputs, cp.SkipPreHandler, cp.RerunNodes, isStream, optMap)
+		nextTasks, err = r.restoreTasks(ctx, cp.Inputs, cp.SkipPreHandler, effectiveRerunNodes(cp.RerunNodes, rerunFromNodes), isStream, optMap)
 		if err != nil {
 			return nil, newGraphRunError(fmt.Errorf("restore tasks fail: %w", err))
 		}
@@ -202,7 +202,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			ctx, input = onGraphStart(ctx, input, isStream)
 			haveOnStart = true
 
-			nextTasks, err = r.restoreTasks(ctx, cp.Inputs, cp.SkipPreHandler, cp.RerunNodes, isStream, optMap)
+			nextTasks, err = r.restoreTasks(ctx, cp.Inputs, cp.SkipPreHandler, effectiveRerunNodes(cp.RerunNodes, rerunFromNodes), isStream, optMap)
 			if err != nil {
 				return nil, newGraphRunError(fmt.Errorf("restore tasks fail: %w", err))
 			}
@@ -791,7 +791,7 @@ func (r *runner) createTasks(ctx context.Context, nodeMap map[string]any, optMap
 	return nextTasks, nil
 }
 
-func getCheckPointInfo(opts ...Option) (checkPointID *string, writeToCheckPointID *string, stateModifier StateModifier, forceNewRun bool) {
+func getCheckPointInfo(opts ...Option) (checkPointID *string, writeToCheckPointID *string, stateModifier StateModifier, forceNewRun bool, rerunFromNodes []string) {
 	for _, opt := range opts {
 		if opt.checkPointID != nil {
 			checkPointID = opt.checkPointID
@@ -802,12 +802,22 @@ func getCheckPointInfo(opts ...Option) (checkPointID *string, writeToCheckPointI
 		if opt.stateModifier != nil {
 			stateModifier = opt.stateModifier
 		}
+		if len(opt.rerunFromNodes) > 0 {
+			rerunFromNodes = append([]string(nil), opt.rerunFromNodes...)
+		}
 		forceNewRun = opt.forceNewRun
 	}
 	if writeToCheckPointID == nil {
 		writeToCheckPointID = checkPointID
 	}
 	return
+}
+
+func effectiveRerunNodes(checkpointNodes []string, overrideNodes []string) []string {
+	if len(overrideNodes) == 0 {
+		return checkpointNodes
+	}
+	return overrideNodes
 }
 
 func (r *runner) restoreTasks(
