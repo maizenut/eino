@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/eino-contrib/jsonschema"
 
@@ -21,12 +22,46 @@ import (
 // - MCP prompt -> prompt.ChatTemplate via RemotePromptCatalog.ChatTemplate
 // - MCP resource -> document.Loader backed by resources/read
 type RemoteAdapter struct {
-	ServerLabel string
+	ServerLabel        string
+	AllowedRemoteTools map[string]struct{}
+	MaxDescBytes       int
+}
+
+type RemoteAdapterOption func(*RemoteAdapter)
+
+func WithAllowedRemoteTools(names []string) RemoteAdapterOption {
+	return func(adapter *RemoteAdapter) {
+		if adapter == nil || len(names) == 0 {
+			return
+		}
+		adapter.AllowedRemoteTools = make(map[string]struct{}, len(names))
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			adapter.AllowedRemoteTools[name] = struct{}{}
+		}
+	}
+}
+
+func WithMaxDescriptionBytes(maxBytes int) RemoteAdapterOption {
+	return func(adapter *RemoteAdapter) {
+		if adapter == nil || maxBytes <= 0 {
+			return
+		}
+		adapter.MaxDescBytes = maxBytes
+	}
 }
 
 // NewRemoteAdapter creates a default adapter that bridges one MCP server's remote capabilities.
-func NewRemoteAdapter(serverLabel string) *RemoteAdapter {
-	return &RemoteAdapter{ServerLabel: serverLabel}
+func NewRemoteAdapter(serverLabel string, opts ...RemoteAdapterOption) *RemoteAdapter {
+	adapter := &RemoteAdapter{ServerLabel: serverLabel}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(adapter)
+		}
+	}
+	return adapter
 }
 
 func (a *RemoteAdapter) ToTools(ctx context.Context, client mcppkg.Client, opts ...mcppkg.Option) ([]tool.BaseTool, error) {
@@ -39,10 +74,16 @@ func (a *RemoteAdapter) ToTools(ctx context.Context, client mcppkg.Client, opts 
 	}
 	result := make([]tool.BaseTool, 0, len(toolsDesc))
 	for _, desc := range toolsDesc {
+		if len(a.AllowedRemoteTools) > 0 {
+			if _, ok := a.AllowedRemoteTools[desc.Name]; !ok {
+				continue
+			}
+		}
 		rt := &RemoteTool{
-			ServerLabel: a.ServerLabel,
-			Client:      client,
-			Remote:      desc,
+			ServerLabel:  a.ServerLabel,
+			Client:       client,
+			Remote:       desc,
+			MaxDescBytes: a.MaxDescBytes,
 		}
 		result = append(result, rt)
 	}
@@ -71,9 +112,10 @@ var _ mcppkg.Adapter = (*RemoteAdapter)(nil)
 
 // RemoteTool is an invokable wrapper for one remote MCP tool.
 type RemoteTool struct {
-	ServerLabel string
-	Client      mcppkg.Client
-	Remote      mcppkg.ToolDescriptor
+	ServerLabel  string
+	Client       mcppkg.Client
+	Remote       mcppkg.ToolDescriptor
+	MaxDescBytes int
 }
 
 func (t *RemoteTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
@@ -85,7 +127,7 @@ func (t *RemoteTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 
 	info := &schema.ToolInfo{
 		Name: name,
-		Desc: t.Remote.Description,
+		Desc: trimDescriptionBytes(t.Remote.Description, t.MaxDescBytes),
 		Extra: map[string]any{
 			"mcp_server_label": t.ServerLabel,
 			"mcp_tool_name":    t.Remote.Name,
@@ -241,4 +283,21 @@ func extractResourceText(raw any) (content string, mimeType string) {
 		return fmt.Sprintf("%v", raw), ""
 	}
 	return string(data), ""
+}
+
+func trimDescriptionBytes(desc string, maxBytes int) string {
+	if maxBytes <= 0 || len(desc) <= maxBytes {
+		return desc
+	}
+	if maxBytes <= len("...") {
+		return "..."
+	}
+	trimmed := desc[:maxBytes-len("...")]
+	for len(trimmed) > 0 && !utf8.ValidString(trimmed) {
+		trimmed = trimmed[:len(trimmed)-1]
+	}
+	if trimmed == "" {
+		return "..."
+	}
+	return trimmed + "..."
 }

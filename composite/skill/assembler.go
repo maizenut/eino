@@ -14,7 +14,8 @@ type Assembler interface {
 
 // DefaultAssembler builds static SkillSpec definitions through a Resolver.
 type DefaultAssembler struct {
-	Resolver *Resolver
+	Resolver           *Resolver
+	CommandToolBuilder *CommandToolBuilder
 }
 
 // NewAssembler creates a static skill assembler.
@@ -43,6 +44,22 @@ func (a *DefaultAssembler) Build(ctx context.Context, spec *SkillSpec) (Runnable
 			toolValue, err := a.Resolver.ResolveTool(ctx, ref)
 			if err != nil {
 				return nil, fmt.Errorf("resolve tool ref %s: %w", ref.Target, err)
+			}
+			result.tools = append(result.tools, toolValue)
+		}
+	}
+
+	if len(spec.CommandTools) > 0 {
+		if a.CommandToolBuilder == nil {
+			return nil, fmt.Errorf("command tool builder is required")
+		}
+		if result.tools == nil {
+			result.tools = make([]tool.BaseTool, 0, len(spec.CommandTools))
+		}
+		for _, commandTool := range spec.CommandTools {
+			toolValue, err := a.CommandToolBuilder.Build(commandTool)
+			if err != nil {
+				return nil, fmt.Errorf("build command tool %s: %w", commandTool.Name, err)
 			}
 			result.tools = append(result.tools, toolValue)
 		}

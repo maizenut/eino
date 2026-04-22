@@ -59,22 +59,29 @@ func TestFileDocumentLoaderDirectoryDiscovery(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	yamlContent := `info:
-  name: dir-skill
-  description: discovered in directory
+	markdownContent := `---
+name: dir-skill
+description: discovered in directory
+version: v1
+tags:
+  - dir
 trigger:
   strategy: keyword
   keywords:
     - dir
-instruction: directory discovery works
+---
+
+# Directory discovery works
+
+This instruction comes from markdown.
 `
-	if err := os.WriteFile(filepath.Join(skillDir, "skill.yaml"), []byte(yamlContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(markdownContent), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
 	loader := &FileDocumentLoader{BaseDir: dir}
 
-	// Load by directory name - should discover skill.yaml inside.
+	// Load by directory name - should discover SKILL.md inside.
 	spec, err := loader.LoadSkillSpec(context.Background(), "my-skill")
 	if err != nil {
 		t.Fatalf("LoadSkillSpec directory: %v", err)
@@ -82,7 +89,10 @@ instruction: directory discovery works
 	if spec.Info.Name != "dir-skill" {
 		t.Fatalf("Info.Name = %q, want dir-skill", spec.Info.Name)
 	}
-	if spec.Instruction != "directory discovery works" {
+	if spec.Info.Version != "v1" {
+		t.Fatalf("Info.Version = %q, want v1", spec.Info.Version)
+	}
+	if spec.Instruction != "# Directory discovery works\n\nThis instruction comes from markdown." {
 		t.Fatalf("Instruction = %q", spec.Instruction)
 	}
 }
