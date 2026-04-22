@@ -4,8 +4,8 @@ import "context"
 
 // Assembler converts a MemorySpec into a RuntimeMemory.
 //
-// Concrete assembler implementations resolve StoreRef, EmbedRef, IndexRef, and
-// policy refs using the shared declarative infrastructure (Ref / Loader /
+// Concrete assembler implementations resolve StoreRef and policy refs using the
+// shared declarative infrastructure (Ref / Loader /
 // Resolver) and return an execution-ready RuntimeMemory.
 //
 // The typical call sequence is:

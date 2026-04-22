@@ -51,3 +51,9 @@ type GraphBacked interface {
 	// The caller must not modify the returned graph.
 	Graph(ctx context.Context) (any, bool, error)
 }
+
+// RecallPolicyAware is an optional interface for RuntimeMemory implementations
+// that expose their effective RecallPolicy to bindings.
+type RecallPolicyAware interface {
+	RecallPolicy(ctx context.Context) *RecallPolicySpec
+}

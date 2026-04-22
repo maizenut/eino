@@ -24,6 +24,10 @@ const (
 	InjectAsContext      = "context"
 	InjectAsSystemPrompt = "system_prompt"
 
+	// Conversation window overflow strategy constants.
+	ConversationOverflowEvictOldest     = "evict_oldest"
+	ConversationOverflowSummarizeOldest = "summarize_oldest"
+
 	// Compaction strategy constants.
 	CompactionStrategySummarize     = "summarize"
 	CompactionStrategyEvict         = "evict"
@@ -101,8 +105,30 @@ type RecallPolicySpec struct {
 	// MinScore is the minimum relevance score a record must have to be returned.
 	MinScore float64 `json:"min_score,omitempty"`
 	// InjectAs controls how recalled records are surfaced to the model/agent.
-	InjectAs string         `json:"inject_as,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	InjectAs string `json:"inject_as,omitempty"`
+	// ConversationWindow carries recent user/assistant turns into the next round
+	// before falling back to semantic recall.
+	ConversationWindow *ConversationWindowSpec `json:"conversation_window,omitempty"`
+	Metadata           map[string]any          `json:"metadata,omitempty"`
+}
+
+// ConversationWindowSpec declares how short-window conversational memory is
+// carried into the next round.
+type ConversationWindowSpec struct {
+	// MaxTurns bounds how many recent user turns are preserved in the working set.
+	MaxTurns int `json:"max_turns,omitempty"`
+	// MaxTokens bounds the estimated token budget of injected history.
+	MaxTokens int `json:"max_tokens,omitempty"`
+	// DirectCopyMaxWords keeps messages at or below this word count unchanged.
+	DirectCopyMaxWords int `json:"direct_copy_max_words,omitempty"`
+	// CompressAboveWords compresses messages at or above this word count.
+	CompressAboveWords int `json:"compress_above_words,omitempty"`
+	// OverflowStrategy controls how overflow is handled after limits are hit.
+	// Supported values are evict_oldest and summarize_oldest.
+	OverflowStrategy string `json:"overflow_strategy,omitempty"`
+	// SummaryRef points to an optional summariser used for overflow compression.
+	SummaryRef *schemad.Ref   `json:"summary_ref,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 // CompactionPolicySpec declares how stored records are compressed or evicted.
@@ -146,8 +172,6 @@ type MemorySpec struct {
 	StoreRef        schemad.Ref           `json:"store_ref"`
 	RecallStoreRefs []schemad.Ref         `json:"recall_store_refs,omitempty"`
 	PrimaryWriteRef *schemad.Ref          `json:"primary_write_ref,omitempty"`
-	EmbedRef        *schemad.Ref          `json:"embed_ref,omitempty"`
-	IndexRef        *schemad.Ref          `json:"index_ref,omitempty"`
 	WritePolicy     *WritePolicySpec      `json:"write_policy,omitempty"`
 	RecallPolicy    *RecallPolicySpec     `json:"recall_policy,omitempty"`
 	CompactPolicy   *CompactionPolicySpec `json:"compact_policy,omitempty"`
