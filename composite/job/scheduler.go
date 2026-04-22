@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,6 +47,10 @@ type runningState struct {
 	cancel context.CancelFunc
 }
 
+type scheduledState struct {
+	cancel context.CancelFunc
+}
+
 // MemoryScheduler resolves and executes tasks synchronously in memory.
 type MemoryScheduler struct {
 	Resolver *Resolver
@@ -55,6 +60,8 @@ type MemoryScheduler struct {
 	tasks       map[string]registeredTask
 	activeByRun map[string]runningState
 	activeByJob map[string]string
+	scheduled   map[string]scheduledState
+	eventTasks  map[string]map[string]struct{}
 }
 
 // NewMemoryScheduler creates an in-memory scheduler.
@@ -68,6 +75,8 @@ func NewMemoryScheduler(resolver *Resolver, store ExecutionStore) *MemorySchedul
 		tasks:       make(map[string]registeredTask),
 		activeByRun: make(map[string]runningState),
 		activeByJob: make(map[string]string),
+		scheduled:   make(map[string]scheduledState),
+		eventTasks:  make(map[string]map[string]struct{}),
 	}
 }
 
@@ -86,7 +95,13 @@ func (s *MemoryScheduler) Register(ctx context.Context, task *TaskSpec, trigger 
 	regOpts := newRegisterOptions(opts...)
 
 	s.mu.Lock()
+	s.unregisterTriggerLocked(taskCopy.Info.ID)
 	s.tasks[taskCopy.Info.ID] = registeredTask{task: taskCopy, trigger: triggerCopy, options: regOpts}
+	if err := s.registerTriggerLocked(taskCopy.Info.ID, triggerCopy); err != nil {
+		delete(s.tasks, taskCopy.Info.ID)
+		s.mu.Unlock()
+		return "", err
+	}
 	s.mu.Unlock()
 
 	if s.Store != nil {
@@ -103,6 +118,7 @@ func (s *MemoryScheduler) Unregister(ctx context.Context, taskID string) error {
 	}
 	s.mu.Lock()
 	delete(s.tasks, taskID)
+	s.unregisterTriggerLocked(taskID)
 	if activeRunID, ok := s.activeByJob[taskID]; ok {
 		if state, exists := s.activeByRun[activeRunID]; exists && state.cancel != nil {
 			state.cancel()
@@ -252,6 +268,34 @@ func (s *MemoryScheduler) Cancel(ctx context.Context, runID string) error {
 	return nil
 }
 
+type EventScheduler interface {
+	EmitEvent(ctx context.Context, event string, payload map[string]any, opts ...RunOption) ([]*RunResult, error)
+}
+
+func (s *MemoryScheduler) EmitEvent(ctx context.Context, event string, payload map[string]any, opts ...RunOption) ([]*RunResult, error) {
+	event = strings.TrimSpace(event)
+	if event == "" {
+		return nil, fmt.Errorf("event name is required")
+	}
+	s.mu.RLock()
+	taskSet := s.eventTasks[event]
+	taskIDs := make([]string, 0, len(taskSet))
+	for taskID := range taskSet {
+		taskIDs = append(taskIDs, taskID)
+	}
+	s.mu.RUnlock()
+
+	results := make([]*RunResult, 0, len(taskIDs))
+	for _, taskID := range taskIDs {
+		result, err := s.Trigger(ctx, taskID, payload, opts...)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 func (s *MemoryScheduler) GetTask(ctx context.Context, taskID string) (*TaskSpec, bool) {
 	_ = ctx
 	s.mu.RLock()
@@ -286,6 +330,119 @@ func (s *MemoryScheduler) ListRuns(ctx context.Context, taskID string) ([]*RunRe
 		return nil, fmt.Errorf("execution store is required")
 	}
 	return s.Store.ListRuns(ctx, taskID)
+}
+
+func (s *MemoryScheduler) registerTriggerLocked(taskID string, trigger *TriggerSpec) error {
+	trigger = normalizeTriggerSpec(trigger)
+	s.unregisterTriggerLocked(taskID)
+	if trigger == nil {
+		return nil
+	}
+	switch trigger.Type {
+	case "", TriggerTypeManual:
+		return nil
+	case TriggerTypeEvent:
+		eventName := strings.TrimSpace(trigger.Event)
+		if eventName == "" {
+			return fmt.Errorf("task %q: event trigger requires trigger.event", taskID)
+		}
+		if s.eventTasks[eventName] == nil {
+			s.eventTasks[eventName] = make(map[string]struct{})
+		}
+		s.eventTasks[eventName][taskID] = struct{}{}
+		return nil
+	case TriggerTypeDelay:
+		if trigger.Delay <= 0 {
+			return fmt.Errorf("task %q: delay trigger requires trigger.delay > 0", taskID)
+		}
+		s.scheduleTaskLocked(taskID, func(ctx context.Context) {
+			timer := time.NewTimer(trigger.Delay)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				_, _ = s.Trigger(context.Background(), taskID, nil)
+			}
+		})
+		return nil
+	case TriggerTypeOnce:
+		runAt := time.Now()
+		if trigger.At != nil {
+			runAt = *trigger.At
+		}
+		wait := time.Until(runAt)
+		if wait < 0 {
+			wait = 0
+		}
+		s.scheduleTaskLocked(taskID, func(ctx context.Context) {
+			timer := time.NewTimer(wait)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				_, _ = s.Trigger(context.Background(), taskID, nil)
+			}
+		})
+		return nil
+	case TriggerTypeCron:
+		interval, err := parseCronInterval(trigger.Cron)
+		if err != nil {
+			return fmt.Errorf("task %q: %w", taskID, err)
+		}
+		s.scheduleTaskLocked(taskID, func(ctx context.Context) {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					_, _ = s.Trigger(context.Background(), taskID, nil)
+				}
+			}
+		})
+		return nil
+	default:
+		return fmt.Errorf("task %q: unsupported trigger type %q", taskID, trigger.Type)
+	}
+}
+
+func (s *MemoryScheduler) unregisterTriggerLocked(taskID string) {
+	if state, ok := s.scheduled[taskID]; ok {
+		if state.cancel != nil {
+			state.cancel()
+		}
+		delete(s.scheduled, taskID)
+	}
+	for eventName, taskSet := range s.eventTasks {
+		delete(taskSet, taskID)
+		if len(taskSet) == 0 {
+			delete(s.eventTasks, eventName)
+		}
+	}
+}
+
+func (s *MemoryScheduler) scheduleTaskLocked(taskID string, run func(context.Context)) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.scheduled[taskID] = scheduledState{cancel: cancel}
+	go run(ctx)
+}
+
+func parseCronInterval(expr string) (time.Duration, error) {
+	expr = strings.TrimSpace(expr)
+	if !strings.HasPrefix(expr, "@every ") {
+		return 0, fmt.Errorf("unsupported cron expression %q, only @every <duration> is supported", expr)
+	}
+	interval, err := time.ParseDuration(strings.TrimSpace(strings.TrimPrefix(expr, "@every ")))
+	if err != nil {
+		return 0, fmt.Errorf("invalid cron interval %q: %w", expr, err)
+	}
+	if interval <= 0 {
+		return 0, fmt.Errorf("invalid cron interval %q: duration must be > 0", expr)
+	}
+	return interval, nil
 }
 
 func (s *MemoryScheduler) applyConcurrencyPolicy(ctx context.Context, taskID string, trigger *TriggerSpec) error {

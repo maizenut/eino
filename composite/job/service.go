@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+type eventScheduler interface {
+	EmitEvent(ctx context.Context, event string, payload map[string]any, opts ...RunOption) ([]*RunResult, error)
+}
+
 // Service wires job loading and scheduling.
 type Service struct {
 	Loader    SpecLoader
@@ -57,6 +61,18 @@ func (s *Service) Trigger(ctx context.Context, taskID string, payload map[string
 		return nil, fmt.Errorf("job scheduler is required")
 	}
 	return s.Scheduler.Trigger(ctx, taskID, payload, opts...)
+}
+
+// EmitEvent triggers all event-bound jobs registered for the given event.
+func (s *Service) EmitEvent(ctx context.Context, event string, payload map[string]any, opts ...RunOption) ([]*RunResult, error) {
+	if s == nil || s.Scheduler == nil {
+		return nil, fmt.Errorf("job scheduler is required")
+	}
+	emitter, ok := s.Scheduler.(eventScheduler)
+	if !ok {
+		return nil, fmt.Errorf("job scheduler does not support event triggers")
+	}
+	return emitter.EmitEvent(ctx, event, payload, opts...)
 }
 
 // Cancel cancels one active run.
