@@ -159,8 +159,12 @@ type BindingSpec struct {
 	// InjectKey is the context or state key used to inject recalled records.
 	InjectKey string `json:"inject_key,omitempty"`
 	// OutputKey is the context or state key used to capture written records.
-	OutputKey string         `json:"output_key,omitempty"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
+	OutputKey string `json:"output_key,omitempty"`
+	// ReckonMode makes BeforeNode inject only metadata (RecordMeta) instead of
+	// full records, reducing context size. The model can then use memory_ponder
+	// or memory_inspire tools to retrieve full content on demand.
+	ReckonMode bool           `json:"reckon_mode,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 // MemorySpec is the static declarative definition of a memory system.
@@ -176,5 +180,7 @@ type MemorySpec struct {
 	RecallPolicy    *RecallPolicySpec     `json:"recall_policy,omitempty"`
 	CompactPolicy   *CompactionPolicySpec `json:"compact_policy,omitempty"`
 	Binding         *BindingSpec          `json:"binding,omitempty"`
+	Actions         []ActionKind          `json:"actions,omitempty"`
+	ActionHandler   *schemad.Ref          `json:"action_handler_ref,omitempty"`
 	Metadata        map[string]any        `json:"metadata,omitempty"`
 }
