@@ -11,6 +11,8 @@ const (
 	TransportSSE = "sse"
 	// TransportWebSocket sends JSON-RPC requests over WebSocket.
 	TransportWebSocket = "websocket"
+	// TransportBytedMCP speaks the ByteDance internal MCP gateway protocol over HTTP.
+	TransportBytedMCP = "bytedmcp"
 )
 
 // Validate checks whether the server spec has the required transport fields.
@@ -29,6 +31,12 @@ func (s ServerSpec) Validate() error {
 	case TransportHTTP, TransportSSE, TransportWebSocket:
 		if s.URL == "" {
 			return fmt.Errorf("mcp %s url is required", s.Transport)
+		}
+	case TransportBytedMCP:
+		if s.URL == "" {
+			if psm, _ := s.Metadata["psm"].(string); psm == "" {
+				return fmt.Errorf("mcp bytedmcp requires url or metadata.psm")
+			}
 		}
 	default:
 		return fmt.Errorf("unsupported mcp transport %s", s.Transport)

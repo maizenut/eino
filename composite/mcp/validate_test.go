@@ -25,6 +25,19 @@ func TestServerSpecValidate(t *testing.T) {
 			spec: ServerSpec{Name: "s1", Transport: TransportWebSocket, URL: "ws://localhost:1234"},
 		},
 		{
+			name: "bytedmcp_ok_url",
+			spec: ServerSpec{Name: "s1", Transport: TransportBytedMCP, URL: "http://gateway/mcp"},
+		},
+		{
+			name: "bytedmcp_ok_psm",
+			spec: ServerSpec{Name: "s1", Transport: TransportBytedMCP, Metadata: map[string]any{"psm": "data.mcp.demo"}},
+		},
+		{
+			name:    "bytedmcp_missing_url_and_psm",
+			spec:    ServerSpec{Name: "s1", Transport: TransportBytedMCP},
+			wantErr: true,
+		},
+		{
 			name:    "missing_name",
 			spec:    ServerSpec{Transport: TransportStdio, Command: "mcp-server"},
 			wantErr: true,
