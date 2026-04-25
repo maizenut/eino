@@ -16,6 +16,6 @@
 //
 // The package reuses the shared declarative infrastructure (Ref, document loader,
 // interpreter resolver, scope-aware cache) from schema/declarative and
-// mirorru/orchestration/blueprint, keeping itself above components without
+// mirroru/orchestration/blueprint, keeping itself above components without
 // duplicating their serialization and resolution machinery.
 package channel

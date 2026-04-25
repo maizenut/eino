@@ -58,5 +58,15 @@ func (s *ChannelSpec) Validate() error {
 	if s.Endpoint.Transport == "" {
 		return fmt.Errorf("channel spec %s: endpoint.transport is required", s.Info.Name)
 	}
+	switch s.Endpoint.Transport {
+	case TransportWebSocket:
+		if s.Endpoint.Address == "" {
+			return fmt.Errorf("channel spec %s: websocket transport requires endpoint.address", s.Info.Name)
+		}
+	case TransportStdio:
+		if s.Endpoint.Command == "" {
+			return fmt.Errorf("channel spec %s: stdio transport requires endpoint.command", s.Info.Name)
+		}
+	}
 	return nil
 }

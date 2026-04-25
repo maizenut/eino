@@ -13,7 +13,7 @@ import (
 	ftool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
-	filesystem "github.com/maizenut/mirorru/components/tool/filesystem"
+	filesystem "github.com/maizenut/mirroru/components/tool/filesystem"
 )
 
 var commandTemplatePattern = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}`)

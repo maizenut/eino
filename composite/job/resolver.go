@@ -8,8 +8,8 @@ import (
 	"github.com/cloudwego/eino/compose"
 	schemad "github.com/cloudwego/eino/schema/declarative"
 	skillpkg "github.com/cloudwego/eino/composite/skill"
-	orcbp "github.com/maizenut/mirorru/orchestration/blueprint"
-	orccompiler "github.com/maizenut/mirorru/orchestration/compiler"
+	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
+	orccompiler "github.com/maizenut/mirroru/orchestration/compiler"
 )
 
 // Resolver resolves task refs into runtime runnables.

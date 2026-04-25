@@ -7,7 +7,7 @@ import (
 
 	"github.com/cloudwego/eino/compose"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	orcbp "github.com/maizenut/mirorru/orchestration/blueprint"
+	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
 )
 
 type fakeInterpreterResolver struct {

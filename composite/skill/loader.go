@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	schemad "github.com/cloudwego/eino/schema/declarative"
@@ -80,6 +81,12 @@ type skillDocument struct {
 	ModelRef     *schemad.Ref      `json:"model_ref,omitempty" yaml:"model_ref,omitempty"`
 	Metadata     map[string]any    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
+
+var (
+	skillCodeSpanPattern    = regexp.MustCompile("`([^`]+)`")
+	skillTokenPattern       = regexp.MustCompile(`[A-Za-z0-9][A-Za-z0-9._/-]*`)
+	skillMakeCommandPattern = regexp.MustCompile(`(?i)\bmake\s+[A-Za-z0-9._/-]+\b`)
+)
 
 // ParseSkillSpecDocument decodes a skill document from YAML, JSON, or SKILL.md frontmatter.
 func ParseSkillSpecDocument(data []byte, path string) (*SkillSpec, error) {
@@ -158,15 +165,105 @@ func (d *skillDocument) toSkillSpec(markdownInstruction string) *SkillSpec {
 	if instruction == "" {
 		instruction = d.Instruction
 	}
+	trigger := d.Trigger
+	if trigger == nil && markdownInstruction != "" {
+		trigger = inferMarkdownTrigger(info, instruction)
+	}
+	metadata := cloneSkillMetadata(d.Metadata)
+	if markdownInstruction != "" {
+		metadata = inferMarkdownMetadata(metadata, instruction)
+	}
 	return &SkillSpec{
 		Info:         info,
-		Trigger:      d.Trigger,
+		Trigger:      trigger,
 		Instruction:  instruction,
 		ToolRefs:     append([]schemad.Ref(nil), d.ToolRefs...),
 		CommandTools: append([]CommandToolSpec(nil), d.CommandTools...),
 		GraphRef:     d.GraphRef,
 		PromptRef:    d.PromptRef,
 		ModelRef:     d.ModelRef,
-		Metadata:     d.Metadata,
+		Metadata:     metadata,
 	}
+}
+
+func inferMarkdownTrigger(info Info, instruction string) *TriggerSpec {
+	patterns := make([]string, 0)
+	seen := make(map[string]struct{})
+	addPattern := func(pattern string) {
+		if pattern == "" {
+			return
+		}
+		if _, ok := seen[pattern]; ok {
+			return
+		}
+		seen[pattern] = struct{}{}
+		patterns = append(patterns, pattern)
+	}
+
+	joined := strings.ToLower(strings.Join([]string{info.Name, info.Description, instruction}, "\n"))
+	if strings.Contains(joined, "smoke test") {
+		addPattern(`(?i)smoke\s+test`)
+	}
+
+	for _, source := range []string{info.Name, info.Description, instruction} {
+		for _, match := range skillCodeSpanPattern.FindAllStringSubmatch(source, -1) {
+			for _, token := range skillTokenPattern.FindAllString(match[1], -1) {
+				addSkillTokenPattern(token, addPattern)
+			}
+		}
+		for _, token := range skillTokenPattern.FindAllString(source, -1) {
+			addSkillTokenPattern(token, addPattern)
+		}
+	}
+
+	if len(patterns) == 0 {
+		return nil
+	}
+	return &TriggerSpec{Strategy: TriggerStrategyPattern, Patterns: patterns}
+}
+
+func addSkillTokenPattern(token string, add func(string)) {
+	token = strings.TrimSpace(token)
+	if len(token) < 4 {
+		return
+	}
+	hasLetter := false
+	for _, r := range token {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			hasLetter = true
+			break
+		}
+	}
+	if !hasLetter {
+		return
+	}
+	add(`(?i)` + regexp.QuoteMeta(token))
+}
+
+func cloneSkillMetadata(metadata map[string]any) map[string]any {
+	if len(metadata) == 0 {
+		return nil
+	}
+	cloned := make(map[string]any, len(metadata))
+	for key, value := range metadata {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func inferMarkdownMetadata(metadata map[string]any, instruction string) map[string]any {
+	if metadata != nil {
+		if _, ok := metadata["test_command"]; ok {
+			return metadata
+		}
+	}
+	match := skillMakeCommandPattern.FindString(instruction)
+	if match == "" {
+		return metadata
+	}
+	if metadata == nil {
+		metadata = make(map[string]any, 1)
+	}
+	metadata["test_command"] = strings.ToLower(strings.TrimSpace(match))
+	return metadata
 }

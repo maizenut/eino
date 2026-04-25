@@ -12,7 +12,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	filesystem "github.com/maizenut/mirorru/components/tool/filesystem"
+	filesystem "github.com/maizenut/mirroru/components/tool/filesystem"
 )
 
 func TestDefaultAssemblerBuild_FromDocuments(t *testing.T) {
@@ -357,16 +357,31 @@ type stubDocumentLoader struct {
 	graph     *schemad.GraphSpec
 }
 
-func (s *stubDocumentLoader) LoadGraphSpec(ctx context.Context, target string) (*schemad.GraphSpec, error) {
+func (s *stubDocumentLoader) LoadGraphSpec(ctx context.Context, ref schemad.Ref) (*schemad.GraphSpec, error) {
+	_ = ctx
+	_ = ref
+	return s.graph, nil
+}
+
+func (s *stubDocumentLoader) LoadGraphBlueprint(ctx context.Context, target string) (*schemad.GraphBlueprint, error) {
 	_ = ctx
 	_ = target
-	return s.graph, nil
+	if s.graph == nil {
+		return nil, nil
+	}
+	return &schemad.GraphBlueprint{Name: s.graph.Name}, nil
 }
 
 func (s *stubDocumentLoader) LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error) {
 	_ = ctx
 	_ = target
 	return s.component, nil
+}
+
+func (s *stubDocumentLoader) LoadNode(ctx context.Context, ref schemad.Ref) (*schemad.NodeSpec, error) {
+	_ = ctx
+	_ = ref
+	return nil, nil
 }
 
 type fakeComponentFactory struct{}

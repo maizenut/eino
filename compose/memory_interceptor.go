@@ -10,7 +10,7 @@ import (
 // MemoryBindingContextKey returns the context key used by the default memory interceptor.
 //
 // Deprecated: default memory binding adapters now live under
-// github.com/maizenut/mirorru/interceptors/memorybinding.
+// github.com/maizenut/mirroru/interceptors/memorybinding.
 func MemoryBindingContextKey(key string) any {
 	return memoryBindingContextKey(key)
 }
@@ -19,7 +19,7 @@ type memoryBindingContextKey string
 
 // MemoryAssembler materializes RuntimeMemory from a declarative spec when needed.
 //
-// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.MemoryAssembler.
+// Deprecated: prefer github.com/maizenut/mirroru/interceptors/memorybinding.MemoryAssembler.
 type MemoryAssembler interface {
 	Build(ctx context.Context, spec *mempkg.MemorySpec) (mempkg.RuntimeMemory, error)
 }
@@ -34,7 +34,7 @@ type memoryNodeInterceptor struct {
 
 // NewMemoryNodeInterceptor creates a compose node interceptor backed by RuntimeMemory or MemorySpec.
 //
-// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.NewNodeInterceptor.
+// Deprecated: prefer github.com/maizenut/mirroru/interceptors/memorybinding.NewNodeInterceptor.
 func NewMemoryNodeInterceptor(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) NodeInterceptor {
 	return &memoryNodeInterceptor{
 		memory:    mem,
@@ -93,14 +93,14 @@ func (i *memoryNodeInterceptor) resolveMemory(ctx context.Context) (mempkg.Runti
 
 // WithMemoryInterceptorOnCompile injects a default memory-backed node interceptor at compile time.
 //
-// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.WithNodeInterceptorOnCompile.
+// Deprecated: prefer github.com/maizenut/mirroru/interceptors/memorybinding.WithNodeInterceptorOnCompile.
 func WithMemoryInterceptorOnCompile(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) GraphCompileOption {
 	return WithNodeInterceptorsOnCompile(NewMemoryNodeInterceptor(mem, binding, spec, assembler))
 }
 
 // WithMemoryInterceptor injects a default memory-backed node interceptor for a single call.
 //
-// Deprecated: prefer github.com/maizenut/mirorru/interceptors/memorybinding.WithNodeInterceptor.
+// Deprecated: prefer github.com/maizenut/mirroru/interceptors/memorybinding.WithNodeInterceptor.
 func WithMemoryInterceptor(mem mempkg.RuntimeMemory, binding mempkg.Binding, spec *mempkg.MemorySpec, assembler MemoryAssembler) Option {
 	return WithNodeInterceptor(NewMemoryNodeInterceptor(mem, binding, spec, assembler))
 }

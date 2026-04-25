@@ -10,7 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/components"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	orcbp "github.com/maizenut/mirorru/orchestration/blueprint"
+	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
 )
 
 func TestServiceLoadAndBuild(t *testing.T) {
@@ -131,7 +131,7 @@ func writeServiceJSONFile(t *testing.T, path string, value any) {
 
 type skillDocumentLoaderAdapter struct {
 	skillLoader SpecLoader
-	docLoader   orcbp.DocumentLoader
+	docLoader   *stubDocumentLoader
 }
 
 func (a skillDocumentLoaderAdapter) LoadSkillSpec(ctx context.Context, target string) (*SkillSpec, error) {
@@ -141,14 +141,47 @@ func (a skillDocumentLoaderAdapter) LoadSkillSpec(ctx context.Context, target st
 	return a.skillLoader.LoadSkillSpec(ctx, target)
 }
 
-func (a skillDocumentLoaderAdapter) LoadGraphSpec(ctx context.Context, target string) (*schemad.GraphSpec, error) {
+func (a skillDocumentLoaderAdapter) LoadGraphSpec(ctx context.Context, ref schemad.Ref) (*schemad.GraphSpec, error) {
 	if a.docLoader == nil {
 		return nil, fmt.Errorf("document loader is required")
 	}
-	return a.docLoader.LoadGraphSpec(ctx, target)
+	return a.docLoader.LoadGraphSpec(ctx, ref)
 }
 
 func (a skillDocumentLoaderAdapter) LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error) {
+	if a.docLoader == nil {
+		return nil, fmt.Errorf("document loader is required")
+	}
+	return a.docLoader.LoadComponentSpec(ctx, target)
+}
+
+func (a skillDocumentLoaderAdapter) LoadNode(ctx context.Context, ref schemad.Ref) (*schemad.NodeSpec, error) {
+	if a.docLoader == nil {
+		return nil, fmt.Errorf("document loader is required")
+	}
+	loader := &orcbp.Loader{Documents: blueprintDocumentLoaderAdapter{docLoader: a.docLoader}}
+	return loader.LoadNode(ctx, ref)
+}
+
+type blueprintDocumentLoaderAdapter struct {
+	docLoader *stubDocumentLoader
+}
+
+func (a blueprintDocumentLoaderAdapter) LoadGraphSpec(ctx context.Context, target string) (*schemad.GraphSpec, error) {
+	if a.docLoader == nil {
+		return nil, fmt.Errorf("document loader is required")
+	}
+	return a.docLoader.LoadGraphSpec(ctx, schemad.Ref{Target: target})
+}
+
+func (a blueprintDocumentLoaderAdapter) LoadGraphBlueprint(ctx context.Context, target string) (*schemad.GraphBlueprint, error) {
+	if a.docLoader == nil {
+		return nil, fmt.Errorf("document loader is required")
+	}
+	return a.docLoader.LoadGraphBlueprint(ctx, target)
+}
+
+func (a blueprintDocumentLoaderAdapter) LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error) {
 	if a.docLoader == nil {
 		return nil, fmt.Errorf("document loader is required")
 	}

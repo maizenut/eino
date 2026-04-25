@@ -10,19 +10,32 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	orcbp "github.com/maizenut/mirorru/orchestration/blueprint"
-	orccompiler "github.com/maizenut/mirorru/orchestration/compiler"
 )
 
-// Resolver resolves skill refs into runtime objects.
-type Resolver struct {
-	Documents           orcbp.DocumentLoader
-	ComponentFactory    schemad.ComponentFactory
-	InterpreterResolver orcbp.InterpreterResolver
+type GraphAssembler interface {
+	AssembleGraph(ctx context.Context, blueprint *schemad.GraphSpec) (compose.AnyGraph, error)
 }
 
-// NewResolver creates a skill resolver backed by declarative infrastructure.
-func NewResolver(documents orcbp.DocumentLoader, factory schemad.ComponentFactory, interpreter orcbp.InterpreterResolver) *Resolver {
+type InterpreterResolver interface {
+	ResolveComponent(ctx context.Context, ref schemad.Ref) (any, error)
+	ResolveFunction(ctx context.Context, ref schemad.Ref) (any, error)
+	ResolveGraph(ctx context.Context, ref schemad.Ref) (compose.AnyGraph, error)
+}
+
+type DocumentLoader interface {
+	LoadGraphSpec(ctx context.Context, ref schemad.Ref) (*schemad.GraphSpec, error)
+	LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error)
+	LoadNode(ctx context.Context, ref schemad.Ref) (*schemad.NodeSpec, error)
+}
+
+type Resolver struct {
+	Documents           DocumentLoader
+	ComponentFactory    schemad.ComponentFactory
+	InterpreterResolver InterpreterResolver
+	GraphAssembler      GraphAssembler
+}
+
+func NewResolver(documents DocumentLoader, factory schemad.ComponentFactory, interpreter InterpreterResolver) *Resolver {
 	return &Resolver{
 		Documents:           documents,
 		ComponentFactory:    factory,
@@ -30,7 +43,11 @@ func NewResolver(documents orcbp.DocumentLoader, factory schemad.ComponentFactor
 	}
 }
 
-// ResolveTool resolves a tool ref into a tool.BaseTool.
+func (r *Resolver) WithGraphAssembler(assembler GraphAssembler) *Resolver {
+	r.GraphAssembler = assembler
+	return r
+}
+
 func (r *Resolver) ResolveTool(ctx context.Context, ref schemad.Ref) (tool.BaseTool, error) {
 	value, err := r.ResolveValue(ctx, ref)
 	if err != nil {
@@ -39,7 +56,6 @@ func (r *Resolver) ResolveTool(ctx context.Context, ref schemad.Ref) (tool.BaseT
 	return schemad.AsTool(value)
 }
 
-// ResolvePrompt resolves a prompt-like ref into a prompt runtime object.
 func (r *Resolver) ResolvePrompt(ctx context.Context, ref schemad.Ref) (any, error) {
 	value, err := r.ResolveValue(ctx, ref)
 	if err != nil {
@@ -54,7 +70,6 @@ func (r *Resolver) ResolvePrompt(ctx context.Context, ref schemad.Ref) (any, err
 	return nil, fmt.Errorf("resolved prompt ref %s to unsupported type %T", ref.Target, value)
 }
 
-// ResolveModel resolves a model-like ref into a model runtime object.
 func (r *Resolver) ResolveModel(ctx context.Context, ref schemad.Ref) (any, error) {
 	value, err := r.ResolveValue(ctx, ref)
 	if err != nil {
@@ -69,20 +84,20 @@ func (r *Resolver) ResolveModel(ctx context.Context, ref schemad.Ref) (any, erro
 	return nil, fmt.Errorf("resolved model ref %s to unsupported type %T", ref.Target, value)
 }
 
-// ResolveGraph resolves a graph ref into compose.AnyGraph.
 func (r *Resolver) ResolveGraph(ctx context.Context, ref schemad.Ref) (compose.AnyGraph, error) {
 	switch ref.Kind {
 	case schemad.RefKindGraphDocument:
 		if r.Documents == nil {
 			return nil, fmt.Errorf("document loader is required for graph ref %s", ref.Target)
 		}
-		loader := &orcbp.Loader{Documents: r.Documents}
-		bp, err := loader.LoadGraph(ctx, ref)
+		spec, err := r.Documents.LoadGraphSpec(ctx, ref)
 		if err != nil {
 			return nil, err
 		}
-		builder := orccompiler.NewSpecCompiler(r.Documents, r.ComponentFactory, r.InterpreterResolver, nil)
-		return builder.AssembleGraph(ctx, bp)
+		if r.GraphAssembler != nil {
+			return r.GraphAssembler.AssembleGraph(ctx, spec)
+		}
+		return nil, fmt.Errorf("graph assembler is required for graph ref %s", ref.Target)
 	case schemad.RefKindInterpreterGraph:
 		if r.InterpreterResolver == nil {
 			return nil, fmt.Errorf("interpreter resolver is required for graph ref %s", ref.Target)
@@ -93,15 +108,13 @@ func (r *Resolver) ResolveGraph(ctx context.Context, ref schemad.Ref) (compose.A
 	}
 }
 
-// ResolveValue resolves a non-graph ref into its runtime object.
 func (r *Resolver) ResolveValue(ctx context.Context, ref schemad.Ref) (any, error) {
 	switch ref.Kind {
 	case schemad.RefKindComponentDocument:
 		if r.Documents == nil {
 			return nil, fmt.Errorf("document loader is required for component ref %s", ref.Target)
 		}
-		loader := &orcbp.Loader{Documents: r.Documents}
-		spec, err := loader.LoadComponent(ctx, ref)
+		spec, err := r.Documents.LoadComponentSpec(ctx, ref.Target)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +178,7 @@ func materializeResolvedValue(ctx context.Context, value any) (any, error) {
 }
 
 type componentResolverAdapter struct {
-	resolver orcbp.InterpreterResolver
+	resolver InterpreterResolver
 }
 
 func (a componentResolverAdapter) ResolveComponent(ctx context.Context, ref schemad.Ref) (any, error) {
