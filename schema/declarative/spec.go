@@ -1,6 +1,10 @@
 package declarative
 
-import "github.com/cloudwego/eino/components"
+import (
+	"strings"
+
+	"github.com/cloudwego/eino/components"
+)
 
 const (
 	RefKindGraphDocument        = "graph_document"
@@ -125,26 +129,28 @@ type GraphBlueprint = GraphSpec
 
 // ComponentKind normalizes a spec kind into a components.Component value.
 func ComponentKind(kind string) components.Component {
-	switch kind {
-	case string(components.ComponentOfPrompt):
+	normalized := strings.ToLower(strings.TrimSpace(kind))
+	normalized = strings.ReplaceAll(normalized, "_", "")
+	switch normalized {
+	case strings.ToLower(string(components.ComponentOfPrompt)), "prompt":
 		return components.ComponentOfPrompt
-	case string(components.ComponentOfAgenticPrompt):
+	case strings.ToLower(string(components.ComponentOfAgenticPrompt)), "agenticprompt":
 		return components.ComponentOfAgenticPrompt
-	case string(components.ComponentOfChatModel):
+	case strings.ToLower(string(components.ComponentOfChatModel)), "chatmodel", "model":
 		return components.ComponentOfChatModel
-	case string(components.ComponentOfAgenticModel):
+	case strings.ToLower(string(components.ComponentOfAgenticModel)), "agenticmodel":
 		return components.ComponentOfAgenticModel
-	case string(components.ComponentOfEmbedding):
+	case strings.ToLower(string(components.ComponentOfEmbedding)), "embedding":
 		return components.ComponentOfEmbedding
-	case string(components.ComponentOfIndexer):
+	case strings.ToLower(string(components.ComponentOfIndexer)), "indexer":
 		return components.ComponentOfIndexer
-	case string(components.ComponentOfRetriever):
+	case strings.ToLower(string(components.ComponentOfRetriever)), "retriever":
 		return components.ComponentOfRetriever
-	case string(components.ComponentOfLoader):
+	case strings.ToLower(string(components.ComponentOfLoader)), "loader":
 		return components.ComponentOfLoader
-	case string(components.ComponentOfTransformer):
+	case strings.ToLower(string(components.ComponentOfTransformer)), "transformer", "documenttransformer":
 		return components.ComponentOfTransformer
-	case string(components.ComponentOfTool):
+	case strings.ToLower(string(components.ComponentOfTool)), "tool":
 		return components.ComponentOfTool
 	default:
 		return components.Component(kind)

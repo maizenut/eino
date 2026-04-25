@@ -34,7 +34,16 @@ func BuildComponent(ctx context.Context, spec *ComponentSpec, factory ComponentF
 		if resolver == nil {
 			return nil, fmt.Errorf("component resolver is required for %s", spec.Impl)
 		}
-		return resolver.ResolveComponent(ctx, Ref{Kind: spec.Impl, Target: spec.Name, Args: spec.Extra})
+		ref := interpreterComponentRef(spec)
+		instance, err := resolver.ResolveComponent(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		validated, err := AsComponentKind(spec.Kind, instance)
+		if err != nil {
+			return nil, err
+		}
+		return validated, nil
 	}
 
 	if factory == nil {
@@ -159,4 +168,11 @@ func AsComponentKind(kind string, instance any) (any, error) {
 	default:
 		return instance, nil
 	}
+}
+
+func interpreterComponentRef(spec *ComponentSpec) Ref {
+	if ref, ok := spec.Refs["component"]; ok {
+		return ref
+	}
+	return Ref{Kind: RefKindInterpreterComponent, Target: spec.Name, Args: spec.Extra}
 }

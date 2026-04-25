@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 
@@ -243,6 +244,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 				isStream,
 				isSubGraph,
 				writeToCheckPointID,
+				*path,
 			)
 		}
 	}
@@ -305,11 +307,12 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			return nil, r.handleInterruptWithSubGraphAndRerunNodes(
 				ctx,
 				tempInfo,
-				append(append(completedTasks, newCompletedTasks...), totalCanceledTasks...), // canceled tasks are handled as rerun
+				append(append(completedTasks, newCompletedTasks...), totalCanceledTasks...),
 				writeToCheckPointID,
 				isSubGraph,
 				cm,
 				isStream,
+				*path,
 			)
 		}
 
@@ -351,6 +354,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 					isSubGraph,
 					cm,
 					isStream,
+					*path,
 				)
 			}
 
@@ -367,7 +371,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 			tempInfo.interruptBeforeNodes = append(tempInfo.interruptBeforeNodes, getHitKey(newNextTasks, r.interruptBeforeNodes)...)
 
 			// simple interrupt
-			return nil, r.handleInterrupt(ctx, tempInfo, append(nextTasks, newNextTasks...), cm.channels, isStream, isSubGraph, writeToCheckPointID)
+			return nil, r.handleInterrupt(ctx, tempInfo, append(nextTasks, newNextTasks...), cm.channels, isStream, isSubGraph, writeToCheckPointID, *path)
 		}
 	}
 }
@@ -412,15 +416,33 @@ func (r *runner) restoreCheckPointState(
 	if cp.State != nil {
 		isResumeTarget, hasData, data := GetResumeContext[any](ctx)
 		if isResumeTarget && hasData {
+			slog.Info("state modifier: ResumeWithData overrides checkpoint state",
+				"path", path.GetPath(),
+				"state_type", fmt.Sprintf("%T", cp.State),
+			)
 			cp.State = data
 		}
 	}
 	if sm != nil && cp.State != nil {
 		mCtx := withStateModifierPhase(ctx, StateModifierPhaseRestore)
+		slog.Debug("state modifier: invoking restore phase",
+			"path", path.GetPath(),
+			"state_type", fmt.Sprintf("%T", cp.State),
+		)
 		err = sm(mCtx, path, cp.State)
 		if err != nil {
+			slog.Error("state modifier: restore phase failed, state will NOT be injected",
+				"path", path.GetPath(),
+				"error", err,
+				"state_type", fmt.Sprintf("%T", cp.State),
+			)
+			cp.State = nil
 			return ctx, newGraphRunError(fmt.Errorf("state modifier restore fail: %w", err))
 		}
+		slog.Info("state modifier: restore phase completed",
+			"path", path.GetPath(),
+			"state_type", fmt.Sprintf("%T", cp.State),
+		)
 	}
 	if cp.State != nil {
 		var parent *internalState
@@ -530,6 +552,7 @@ func (r *runner) handleInterrupt(
 	isStream bool,
 	isSubGraph bool,
 	checkPointID *string,
+	path NodePath,
 ) error {
 	cp := &checkpoint{
 		Channels:       channels,
@@ -537,18 +560,31 @@ func (r *runner) handleInterrupt(
 		SkipPreHandler: map[string]bool{},
 	}
 	if r.runCtx != nil {
-		// current graph has enable state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
 			copiedState, err := deepCopyState(state.state, r.checkPointer.serializer)
 			state.mu.Unlock()
 			if err != nil {
+				slog.Error("state modifier: deepCopy failed during interrupt",
+					"path", path.GetPath(),
+					"error", err,
+					"state_type", fmt.Sprintf("%T", state.state),
+				)
 				return fmt.Errorf("failed to copy state: %w", err)
 			}
 			if sm := getStateModifier(ctx); sm != nil && copiedState != nil {
 				mCtx := withStateModifierPhase(ctx, StateModifierPhasePersist)
-				if err := sm(mCtx, NodePath{}, copiedState); err != nil {
-					return fmt.Errorf("state modifier persist fail: %w", err)
+				slog.Debug("state modifier: invoking persist phase",
+					"path", path.GetPath(),
+					"state_type", fmt.Sprintf("%T", copiedState),
+				)
+				if smErr := sm(mCtx, path, copiedState); smErr != nil {
+					slog.Error("state modifier: persist phase failed, state will NOT be persisted",
+						"path", path.GetPath(),
+						"error", smErr,
+						"state_type", fmt.Sprintf("%T", copiedState),
+					)
+					copiedState = nil
 				}
 			}
 			cp.State = copiedState
@@ -592,6 +628,11 @@ func (r *runner) handleInterrupt(
 		if err != nil {
 			return fmt.Errorf("failed to set checkpoint: %w, checkPointID: %s", err, *checkPointID)
 		}
+		slog.Info("state modifier: checkpoint persisted",
+			"path", path.GetPath(),
+			"checkpoint_id", *checkPointID,
+			"has_state", cp.State != nil,
+		)
 	}
 
 	intInfo.InterruptContexts = core.ToInterruptContexts(is, nil)
@@ -632,6 +673,7 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 	isSubGraph bool,
 	cm *channelManager,
 	isStream bool,
+	path NodePath,
 ) error {
 	var rerunTasks, subgraphTasks, otherTasks []*task
 	skipPreHandler := map[string]bool{}
@@ -675,18 +717,31 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 		SubGraphs:      make(map[string]*checkpoint),
 	}
 	if r.runCtx != nil {
-		// current graph has enable state
 		if state, ok := ctx.Value(stateKey{}).(*internalState); ok {
 			state.mu.Lock()
 			copiedState, err_ := deepCopyState(state.state, r.checkPointer.serializer)
 			state.mu.Unlock()
 			if err_ != nil {
+				slog.Error("state modifier: deepCopy failed during interrupt with subgraphs",
+					"path", path.GetPath(),
+					"error", err_,
+					"state_type", fmt.Sprintf("%T", state.state),
+				)
 				return fmt.Errorf("failed to copy state: %w", err_)
 			}
 			if sm := getStateModifier(ctx); sm != nil && copiedState != nil {
 				mCtx := withStateModifierPhase(ctx, StateModifierPhasePersist)
-				if err := sm(mCtx, NodePath{}, copiedState); err != nil {
-					return fmt.Errorf("state modifier persist fail: %w", err)
+				slog.Debug("state modifier: invoking persist phase (subgraph interrupt)",
+					"path", path.GetPath(),
+					"state_type", fmt.Sprintf("%T", copiedState),
+				)
+				if smErr := sm(mCtx, path, copiedState); smErr != nil {
+					slog.Error("state modifier: persist phase failed, state will NOT be persisted (subgraph interrupt)",
+						"path", path.GetPath(),
+						"error", smErr,
+						"state_type", fmt.Sprintf("%T", copiedState),
+					)
+					copiedState = nil
 				}
 			}
 			cp.State = copiedState
@@ -738,6 +793,11 @@ func (r *runner) handleInterruptWithSubGraphAndRerunNodes(
 		if err != nil {
 			return fmt.Errorf("failed to set checkpoint: %w, checkPointID: %s", err, *checkPointID)
 		}
+		slog.Info("state modifier: checkpoint persisted (subgraph interrupt)",
+			"path", path.GetPath(),
+			"checkpoint_id", *checkPointID,
+			"has_state", cp.State != nil,
+		)
 	}
 	intInfo.InterruptContexts = core.ToInterruptContexts(is, nil)
 	return &interruptError{Info: intInfo}
