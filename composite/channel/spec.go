@@ -58,14 +58,29 @@ func (s *ChannelSpec) Validate() error {
 	if s.Endpoint.Transport == "" {
 		return fmt.Errorf("channel spec %s: endpoint.transport is required", s.Info.Name)
 	}
+	if _, isScript := scriptTransports[s.Endpoint.Transport]; isScript {
+		return fmt.Errorf("channel spec %s: transport %q is not supported; cronjob channels only deliver messages to graph node runnables", s.Info.Name, s.Endpoint.Transport)
+	}
 	switch s.Endpoint.Transport {
 	case TransportWebSocket:
 		if s.Endpoint.Address == "" {
 			return fmt.Errorf("channel spec %s: websocket transport requires endpoint.address", s.Info.Name)
 		}
 	case TransportStdio:
-		if s.Endpoint.Command == "" {
-			return fmt.Errorf("channel spec %s: stdio transport requires endpoint.command", s.Info.Name)
+		// endpoint.command is optional: when stdio describes the host
+		// process's own stdin/stdout (e.g. console-cli mode) no command is
+		// required. When command is set the runtime may spawn it as a
+		// subprocess.
+	case TransportCronJob:
+		if s.Endpoint.Metadata == nil {
+			return fmt.Errorf("channel spec %s: cronjob transport requires endpoint.metadata.schedule", s.Info.Name)
+		}
+		schedule, _ := s.Endpoint.Metadata["schedule"].(string)
+		if schedule == "" {
+			return fmt.Errorf("channel spec %s: cronjob transport requires endpoint.metadata.schedule", s.Info.Name)
+		}
+		if s.GraphRef == nil {
+			return fmt.Errorf("channel spec %s: cronjob transport requires graph_ref", s.Info.Name)
 		}
 	}
 	return nil
