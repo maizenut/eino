@@ -7,7 +7,6 @@ import (
 
 	"github.com/cloudwego/eino/compose"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
 )
 
 type fakeInterpreterResolver struct {
@@ -118,4 +117,4 @@ func TestMemorySchedulerCronEveryTrigger(t *testing.T) {
 	}
 }
 
-var _ orcbp.InterpreterResolver = (*fakeInterpreterResolver)(nil)
+var _ InterpreterResolver = (*fakeInterpreterResolver)(nil)

@@ -30,7 +30,7 @@ type SupervisorBuilder struct {
 	Recovery   RecoverySpec
 	Bindings   []BindingSpec
 	Policies   []PolicySpec
-	Boundaries []BoundarySpec
+	Boundaries []SubGraphSpec
 	Exports    []ExportSpec
 	Metadata   map[string]any
 }
@@ -132,8 +132,8 @@ func (b SupervisorBuilder) BuildSpec() (GraphSpec, error) {
 	for _, policy := range b.Policies {
 		spec.Policies = append(spec.Policies, copyPolicySpec(policy))
 	}
-	for _, boundary := range b.Boundaries {
-		spec.Boundaries = append(spec.Boundaries, copyBoundarySpec(boundary))
+	for _, subgraph := range b.Boundaries {
+		spec.Boundaries = append(spec.Boundaries, copySubGraphSpec(subgraph))
 	}
 	for _, export := range b.Exports {
 		spec.Exports = append(spec.Exports, copyExportSpec(export))
@@ -163,9 +163,9 @@ type ExpandedReActConfig struct {
 	GraphStateSchemaRef  SchemaRef
 	NodeStateSchemas     map[NodeID]SchemaRef
 	AfterToModelEdge     *ProjectionSpec
-	ToolBoundaryID       BoundaryID
-	ToolBoundaryName     string
-	BoundaryProjection   *BoundaryProjectionSpec
+	ToolSubGraphID       SubGraphID
+	ToolSubGraphName     string
+	SubGraphProjection   *SubGraphProjectionSpec
 	AllowedBindings      []BindingRef
 	AllowedTools         []string
 	AllowedMemories      []string
@@ -221,9 +221,9 @@ func BuildExpandedReActSpec(config ExpandedReActConfig) (GraphSpec, error) {
 	if policyRef == "" {
 		policyRef = PolicyRef(fmt.Sprintf("policy.%s.react", config.Name))
 	}
-	boundaryID := config.ToolBoundaryID
-	if boundaryID == "" {
-		boundaryID = BoundaryID(fmt.Sprintf("%s.tools", config.Name))
+	subgraphID := config.ToolSubGraphID
+	if subgraphID == "" {
+		subgraphID = SubGraphID(fmt.Sprintf("%s.tools", config.Name))
 	}
 	afterProjection := copyProjectionSpec(config.AfterToModelEdge)
 	if afterProjection == nil {
@@ -309,26 +309,26 @@ func BuildExpandedReActSpec(config ExpandedReActConfig) (GraphSpec, error) {
 			RecoveryScopeRef: loopScopeID,
 			PolicyRef:        policyRef,
 		}},
-		Boundaries: []BoundarySpec{{
-			ID:        boundaryID,
-			Name:      config.ToolBoundaryName,
+		Boundaries: []SubGraphSpec{{
+			ID:        subgraphID,
+			Name:      config.ToolSubGraphName,
 			EntryNode: "tools",
 			ExitNodes: []NodeID{"after_tools"},
-			Projection: copyBoundaryProjectionSpec(func() *BoundaryProjectionSpec {
-				if config.BoundaryProjection != nil {
-					return config.BoundaryProjection
+			Projection: copySubGraphProjectionSpec(func() *SubGraphProjectionSpec {
+				if config.SubGraphProjection != nil {
+					return config.SubGraphProjection
 				}
 				if afterProjection == nil {
 					return nil
 				}
-				return &BoundaryProjectionSpec{
+				return &SubGraphProjectionSpec{
 					Reads:   append([]string(nil), afterProjection.Reads...),
 					Writes:  append([]string(nil), afterProjection.Writes...),
 					Mapping: copyStringMap(afterProjection.Mapping),
 					Mode:    afterProjection.Mode,
 				}
 			}()),
-			Visibility: &BoundaryVisibilitySpec{
+			Visibility: &SubGraphVisibilitySpec{
 				AllowedBindings: append([]BindingRef(nil), config.AllowedBindings...),
 				AllowedTools:    append([]string(nil), config.AllowedTools...),
 				AllowedMemories: append([]string(nil), config.AllowedMemories...),
@@ -392,7 +392,7 @@ type LoopBuilder struct {
 	Recovery   RecoverySpec
 	Bindings   []BindingSpec
 	Policies   []PolicySpec
-	Boundaries []BoundarySpec
+	Boundaries []SubGraphSpec
 	Exports    []ExportSpec
 	Metadata   map[string]any
 }
@@ -502,8 +502,8 @@ func (b LoopBuilder) BuildSpec() (GraphSpec, error) {
 	for _, policy := range b.Policies {
 		spec.Policies = append(spec.Policies, copyPolicySpec(policy))
 	}
-	for _, boundary := range b.Boundaries {
-		spec.Boundaries = append(spec.Boundaries, copyBoundarySpec(boundary))
+	for _, subgraph := range b.Boundaries {
+		spec.Boundaries = append(spec.Boundaries, copySubGraphSpec(subgraph))
 	}
 	for _, export := range b.Exports {
 		spec.Exports = append(spec.Exports, copyExportSpec(export))
@@ -542,7 +542,7 @@ type PlanExecBuilder struct {
 	Recovery   RecoverySpec
 	Bindings   []BindingSpec
 	Policies   []PolicySpec
-	Boundaries []BoundarySpec
+	Boundaries []SubGraphSpec
 	Exports    []ExportSpec
 	Metadata   map[string]any
 }
@@ -668,8 +668,8 @@ func (b PlanExecBuilder) BuildSpec() (GraphSpec, error) {
 	for _, policy := range b.Policies {
 		spec.Policies = append(spec.Policies, copyPolicySpec(policy))
 	}
-	for _, boundary := range b.Boundaries {
-		spec.Boundaries = append(spec.Boundaries, copyBoundarySpec(boundary))
+	for _, subgraph := range b.Boundaries {
+		spec.Boundaries = append(spec.Boundaries, copySubGraphSpec(subgraph))
 	}
 	for _, export := range b.Exports {
 		spec.Exports = append(spec.Exports, copyExportSpec(export))
@@ -818,16 +818,16 @@ func copyPolicySpec(spec PolicySpec) PolicySpec {
 	return PolicySpec{Ref: spec.Ref, Kind: spec.Kind, Config: copyAnyMap(spec.Config), Metadata: copyAnyMap(spec.Metadata)}
 }
 
-func copyBoundarySpec(spec BoundarySpec) BoundarySpec {
-	return BoundarySpec{
+func copySubGraphSpec(spec SubGraphSpec) SubGraphSpec {
+	return SubGraphSpec{
 		ID:               spec.ID,
 		Name:             spec.Name,
 		EntryNode:        spec.EntryNode,
 		ExitNodes:        append([]NodeID(nil), spec.ExitNodes...),
-		Projection:       copyBoundaryProjectionSpec(spec.Projection),
-		Visibility:       copyBoundaryVisibilitySpec(spec.Visibility),
+		Projection:       copySubGraphProjectionSpec(spec.Projection),
+		Visibility:       copySubGraphVisibilitySpec(spec.Visibility),
 		RecoveryScopeRef: spec.RecoveryScopeRef,
-		Ownership:        copyBoundaryOwnershipSpec(spec.Ownership),
+		Ownership:        copySubGraphOwnershipSpec(spec.Ownership),
 		Metadata:         copyAnyMap(spec.Metadata),
 	}
 }
@@ -843,25 +843,25 @@ func copyProjectionSpec(spec *ProjectionSpec) *ProjectionSpec {
 	return &ProjectionSpec{Reads: append([]string(nil), spec.Reads...), Writes: append([]string(nil), spec.Writes...), Mapping: copyStringMap(spec.Mapping), Mode: spec.Mode}
 }
 
-func copyBoundaryProjectionSpec(spec *BoundaryProjectionSpec) *BoundaryProjectionSpec {
+func copySubGraphProjectionSpec(spec *SubGraphProjectionSpec) *SubGraphProjectionSpec {
 	if spec == nil {
 		return nil
 	}
-	return &BoundaryProjectionSpec{Reads: append([]string(nil), spec.Reads...), Writes: append([]string(nil), spec.Writes...), Mapping: copyStringMap(spec.Mapping), Mode: spec.Mode}
+	return &SubGraphProjectionSpec{Reads: append([]string(nil), spec.Reads...), Writes: append([]string(nil), spec.Writes...), Mapping: copyStringMap(spec.Mapping), Mode: spec.Mode}
 }
 
-func copyBoundaryVisibilitySpec(spec *BoundaryVisibilitySpec) *BoundaryVisibilitySpec {
+func copySubGraphVisibilitySpec(spec *SubGraphVisibilitySpec) *SubGraphVisibilitySpec {
 	if spec == nil {
 		return nil
 	}
-	return &BoundaryVisibilitySpec{AllowedBindings: append([]BindingRef(nil), spec.AllowedBindings...), AllowedTools: append([]string(nil), spec.AllowedTools...), AllowedMemories: append([]string(nil), spec.AllowedMemories...)}
+	return &SubGraphVisibilitySpec{AllowedBindings: append([]BindingRef(nil), spec.AllowedBindings...), AllowedTools: append([]string(nil), spec.AllowedTools...), AllowedMemories: append([]string(nil), spec.AllowedMemories...)}
 }
 
-func copyBoundaryOwnershipSpec(spec *BoundaryOwnershipSpec) *BoundaryOwnershipSpec {
+func copySubGraphOwnershipSpec(spec *SubGraphOwnershipSpec) *SubGraphOwnershipSpec {
 	if spec == nil {
 		return nil
 	}
-	return &BoundaryOwnershipSpec{OwnerBlockID: spec.OwnerBlockID, OwnerNodeID: spec.OwnerNodeID, OwnerDomain: spec.OwnerDomain}
+	return &SubGraphOwnershipSpec{OwnerBlockID: spec.OwnerBlockID, OwnerNodeID: spec.OwnerNodeID, OwnerDomain: spec.OwnerDomain}
 }
 
 func copyConditionSpec(spec *ConditionSpec) *ConditionSpec {

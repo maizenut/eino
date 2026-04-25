@@ -8,7 +8,7 @@ type Version = builderpkg.Version
 type NodeID = builderpkg.NodeID
 type EdgeID = builderpkg.EdgeID
 type BlockID = builderpkg.BlockID
-type BoundaryID = builderpkg.BoundaryID
+type SubGraphID = builderpkg.SubGraphID
 
 type SchemaRef = builderpkg.SchemaRef
 type HandlerRef = builderpkg.HandlerRef
@@ -60,9 +60,9 @@ const (
 type ConditionSpec = builderpkg.ConditionSpec
 type ProjectionSpec = builderpkg.ProjectionSpec
 type ErrorMatchSpec = builderpkg.ErrorMatchSpec
-type BoundaryProjectionSpec = builderpkg.BoundaryProjectionSpec
-type BoundaryVisibilitySpec = builderpkg.BoundaryVisibilitySpec
-type BoundaryOwnershipSpec = builderpkg.BoundaryOwnershipSpec
+type SubGraphProjectionSpec = builderpkg.SubGraphProjectionSpec
+type SubGraphVisibilitySpec = builderpkg.SubGraphVisibilitySpec
+type SubGraphOwnershipSpec = builderpkg.SubGraphOwnershipSpec
 
 type BindingSpec = builderpkg.BindingSpec
 type PolicySpec = builderpkg.PolicySpec
@@ -72,7 +72,7 @@ type StructuralPlan = builderpkg.StructuralPlan
 type PlannedNode = builderpkg.PlannedNode
 type PlannedEdge = builderpkg.PlannedEdge
 type PlannedBlock = builderpkg.PlannedBlock
-type PlannedBoundary = builderpkg.PlannedBoundary
+type PlannedSubGraph = builderpkg.PlannedSubGraph
 type StateRecoveryPlan = builderpkg.StateRecoveryPlan
 type PlannedProjection = builderpkg.PlannedProjection
 type PlannedCheckpointScope = builderpkg.PlannedCheckpointScope

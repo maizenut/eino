@@ -10,7 +10,6 @@ import (
 
 	"github.com/cloudwego/eino/components"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
 )
 
 func TestServiceLoadAndBuild(t *testing.T) {
@@ -159,31 +158,5 @@ func (a skillDocumentLoaderAdapter) LoadNode(ctx context.Context, ref schemad.Re
 	if a.docLoader == nil {
 		return nil, fmt.Errorf("document loader is required")
 	}
-	loader := &orcbp.Loader{Documents: blueprintDocumentLoaderAdapter{docLoader: a.docLoader}}
-	return loader.LoadNode(ctx, ref)
-}
-
-type blueprintDocumentLoaderAdapter struct {
-	docLoader *stubDocumentLoader
-}
-
-func (a blueprintDocumentLoaderAdapter) LoadGraphSpec(ctx context.Context, target string) (*schemad.GraphSpec, error) {
-	if a.docLoader == nil {
-		return nil, fmt.Errorf("document loader is required")
-	}
-	return a.docLoader.LoadGraphSpec(ctx, schemad.Ref{Target: target})
-}
-
-func (a blueprintDocumentLoaderAdapter) LoadGraphBlueprint(ctx context.Context, target string) (*schemad.GraphBlueprint, error) {
-	if a.docLoader == nil {
-		return nil, fmt.Errorf("document loader is required")
-	}
-	return a.docLoader.LoadGraphBlueprint(ctx, target)
-}
-
-func (a blueprintDocumentLoaderAdapter) LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error) {
-	if a.docLoader == nil {
-		return nil, fmt.Errorf("document loader is required")
-	}
-	return a.docLoader.LoadComponentSpec(ctx, target)
+	return a.docLoader.LoadNode(ctx, ref)
 }

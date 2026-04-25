@@ -6,7 +6,6 @@ require (
 	github.com/bytedance/sonic v1.15.0
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/websocket v1.5.3
 	github.com/nikolalohinski/gonja v1.5.3
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f
 	github.com/stretchr/testify v1.10.0

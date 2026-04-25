@@ -31,7 +31,7 @@ const (
 	SelectPrefixComponent       = "component:"
 )
 
-// Ref describes a cross-boundary declarative reference.
+// Ref describes a declarative reference to a document or runtime symbol.
 type Ref struct {
 	Kind   string         `json:"kind"`
 	Target string         `json:"target"`
@@ -63,17 +63,17 @@ type LambdaSpec struct {
 	Options    map[string]any `json:"options,omitempty"`
 }
 
-type BoundaryMode string
+type SubGraphMode string
 
 const (
-	BoundaryModeInvoke    BoundaryMode = "invoke"
-	BoundaryModeDelegate  BoundaryMode = "delegate"
-	BoundaryModeSupervise BoundaryMode = "supervise"
-	BoundaryModeHandoff   BoundaryMode = "handoff"
+	SubGraphModeInvoke    SubGraphMode = "invoke"
+	SubGraphModeDelegate  SubGraphMode = "delegate"
+	SubGraphModeSupervise SubGraphMode = "supervise"
+	SubGraphModeHandoff   SubGraphMode = "handoff"
 )
 
-type BoundaryPolicy struct {
-	Mode             BoundaryMode   `json:"mode,omitempty"`
+type SubGraphPolicy struct {
+	Mode             SubGraphMode   `json:"mode,omitempty"`
 	ErrorPolicy      string         `json:"error_policy,omitempty"`
 	CheckpointPolicy string         `json:"checkpoint_policy,omitempty"`
 	ResumePolicy     string         `json:"resume_policy,omitempty"`
@@ -82,9 +82,9 @@ type BoundaryPolicy struct {
 	Metadata         map[string]any `json:"metadata,omitempty"`
 }
 
-type BoundaryNodeSpec struct {
+type SubGraphNodeSpec struct {
 	Enabled bool            `json:"enabled,omitempty"`
-	Policy  *BoundaryPolicy `json:"policy,omitempty"`
+	Policy  *SubGraphPolicy `json:"policy,omitempty"`
 }
 
 // NodeSpec declares a graph node.
@@ -95,7 +95,7 @@ type NodeSpec struct {
 	Component *ComponentRef     `json:"component,omitempty"`
 	Lambda    *LambdaSpec       `json:"lambda,omitempty"`
 	GraphRef  *Ref              `json:"graph_ref,omitempty"`
-	Boundary  *BoundaryNodeSpec `json:"boundary,omitempty"`
+	SubGraph  *SubGraphNodeSpec `json:"subgraph,omitempty"`
 	InputKey  string            `json:"input_key,omitempty"`
 	OutputKey string            `json:"output_key,omitempty"`
 	Options   map[string]any    `json:"options,omitempty"`

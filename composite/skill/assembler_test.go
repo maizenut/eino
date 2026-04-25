@@ -12,7 +12,6 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	schemad "github.com/cloudwego/eino/schema/declarative"
-	filesystem "github.com/maizenut/mirroru/components/tool/filesystem"
 )
 
 func TestDefaultAssemblerBuild_FromDocuments(t *testing.T) {
@@ -27,7 +26,7 @@ func TestDefaultAssemblerBuild_FromDocuments(t *testing.T) {
 			Type: schemad.GraphTypeGraph,
 		},
 	}
-	resolver := NewResolver(loader, fakeComponentFactory{}, nil)
+	resolver := NewResolver(loader, fakeComponentFactory{}, nil).WithGraphAssembler(fakeGraphAssembler{})
 	assembler := NewAssembler(resolver)
 
 	runnable, err := assembler.Build(context.Background(), &SkillSpec{
@@ -400,6 +399,14 @@ func (t fakeTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{Name: t.name}, nil
 }
 
+type fakeGraphAssembler struct{}
+
+func (fakeGraphAssembler) AssembleGraph(ctx context.Context, spec *schemad.GraphSpec) (compose.AnyGraph, error) {
+	_ = ctx
+	_ = spec
+	return compose.NewGraph[map[string]any, map[string]any](), nil
+}
+
 type stubInterpreterResolver struct {
 	functions map[string]any
 	graphs    map[string]compose.AnyGraph
@@ -407,9 +414,9 @@ type stubInterpreterResolver struct {
 
 type fakeCommandShell struct{}
 
-func (fakeCommandShell) Execute(ctx context.Context, req *filesystem.ExecuteRequest) (*filesystem.ExecuteResponse, error) {
+func (fakeCommandShell) Execute(ctx context.Context, req *CommandExecuteRequest) (*CommandExecuteResponse, error) {
 	_ = ctx
-	return &filesystem.ExecuteResponse{Output: req.Command + " @ " + req.Cwd}, nil
+	return &CommandExecuteResponse{Output: req.Command + " @ " + req.Cwd}, nil
 }
 
 func (s stubInterpreterResolver) ResolveObject(ctx context.Context, ref schemad.Ref) (any, error) {

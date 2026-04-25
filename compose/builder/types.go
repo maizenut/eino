@@ -6,7 +6,7 @@ type Version string
 type NodeID string
 type EdgeID string
 type BlockID string
-type BoundaryID string
+type SubGraphID string
 
 type SchemaRef string
 type HandlerRef string
@@ -25,7 +25,7 @@ type GraphSpec struct {
 	Nodes      []NodeSpec
 	Edges      []EdgeSpec
 	Blocks     []BlockSpec
-	Boundaries []BoundarySpec
+	Boundaries []SubGraphSpec
 
 	State    StateSpec
 	Recovery RecoverySpec
@@ -137,32 +137,32 @@ const (
 	BlockKindFallback BlockKind = "fallback"
 )
 
-type BoundarySpec struct {
-	ID               BoundaryID
+type SubGraphSpec struct {
+	ID               SubGraphID
 	Name             string
 	EntryNode        NodeID
 	ExitNodes        []NodeID
-	Projection       *BoundaryProjectionSpec
-	Visibility       *BoundaryVisibilitySpec
+	Projection       *SubGraphProjectionSpec
+	Visibility       *SubGraphVisibilitySpec
 	RecoveryScopeRef CheckpointScopeID
-	Ownership        *BoundaryOwnershipSpec
+	Ownership        *SubGraphOwnershipSpec
 	Metadata         map[string]any
 }
 
-type BoundaryProjectionSpec struct {
+type SubGraphProjectionSpec struct {
 	Reads   []string
 	Writes  []string
 	Mapping map[string]string
 	Mode    ProjectionMode
 }
 
-type BoundaryVisibilitySpec struct {
+type SubGraphVisibilitySpec struct {
 	AllowedBindings []BindingRef
 	AllowedTools    []string
 	AllowedMemories []string
 }
 
-type BoundaryOwnershipSpec struct {
+type SubGraphOwnershipSpec struct {
 	OwnerBlockID BlockID
 	OwnerNodeID  NodeID
 	OwnerDomain  string
@@ -273,7 +273,7 @@ type StructuralPlan struct {
 	Nodes      []PlannedNode
 	Edges      []PlannedEdge
 	Blocks     []PlannedBlock
-	Boundaries []PlannedBoundary
+	Boundaries []PlannedSubGraph
 	EntryNodes []NodeID
 	ExitNodes  []NodeID
 }
@@ -315,15 +315,15 @@ type PlannedBlock struct {
 	Metadata         map[string]any
 }
 
-type PlannedBoundary struct {
-	ID               BoundaryID
+type PlannedSubGraph struct {
+	ID               SubGraphID
 	Name             string
 	EntryNode        NodeID
 	ExitNodes        []NodeID
-	Projection       *BoundaryProjectionSpec
-	Visibility       *BoundaryVisibilitySpec
+	Projection       *SubGraphProjectionSpec
+	Visibility       *SubGraphVisibilitySpec
 	RecoveryScopeRef CheckpointScopeID
-	Ownership        *BoundaryOwnershipSpec
+	Ownership        *SubGraphOwnershipSpec
 	Metadata         map[string]any
 }
 
@@ -342,7 +342,7 @@ type StateRecoveryPlan struct {
 
 type PlannedProjection struct {
 	EdgeID     EdgeID
-	BoundaryID BoundaryID
+	SubGraphID SubGraphID
 	Reads      []string
 	Writes     []string
 	Mapping    map[string]string
@@ -369,7 +369,7 @@ type PlannedReplayPolicy struct {
 type RuntimeBindingPlan struct {
 	NodeBindings        map[NodeID]BindingRef
 	NodePolicies        map[NodeID]PolicyRef
-	BoundaryBindings    map[BoundaryID][]BindingRef
+	SubGraphBindings    map[SubGraphID][]BindingRef
 	InterceptorBindings []BindingRef
 	VisibilityPolicies  map[string]PolicyRef
 	BindingCatalog      map[BindingRef]BindingSpec
@@ -380,7 +380,7 @@ type BuildArtifact struct {
 	NodeViews     []ArtifactNodeView
 	EdgeViews     []ArtifactEdgeView
 	BlockViews    []ArtifactBlockView
-	BoundaryViews []ArtifactBoundaryView
+	SubGraphViews []ArtifactSubGraphView
 	StateViews    []ArtifactStateView
 	ResumeViews   []ArtifactResumeView
 }
@@ -403,8 +403,8 @@ type ArtifactBlockView struct {
 	Kind BlockKind
 }
 
-type ArtifactBoundaryView struct {
-	ID        BoundaryID
+type ArtifactSubGraphView struct {
+	ID        SubGraphID
 	EntryNode NodeID
 }
 

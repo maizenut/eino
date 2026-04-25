@@ -13,21 +13,39 @@ import (
 	ftool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
-	filesystem "github.com/maizenut/mirroru/components/tool/filesystem"
 )
 
 var commandTemplatePattern = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}`)
 
 type CommandToolBuilderConfig struct {
 	WorkspaceRoot string
-	Shell         filesystem.Shell
-	Jobs          filesystem.BackgroundJobs
+	Shell         CommandShell
+	Jobs          CommandBackgroundJobs
+}
+
+type CommandExecuteRequest struct {
+	Command string
+	Cwd     string
+}
+
+type CommandExecuteResponse struct {
+	Output    string
+	ExitCode  *int
+	Truncated bool
+}
+
+type CommandShell interface {
+	Execute(ctx context.Context, req *CommandExecuteRequest) (*CommandExecuteResponse, error)
+}
+
+type CommandBackgroundJobs interface {
+	StartJob(ctx context.Context, command string, cwd string) (string, error)
 }
 
 type CommandToolBuilder struct {
 	WorkspaceRoot string
-	Shell         filesystem.Shell
-	Jobs          filesystem.BackgroundJobs
+	Shell         CommandShell
+	Jobs          CommandBackgroundJobs
 }
 
 func NewCommandToolBuilder(cfg CommandToolBuilderConfig) *CommandToolBuilder {
@@ -71,12 +89,15 @@ func (b *CommandToolBuilder) Build(spec CommandToolSpec) (ftool.BaseTool, error)
 		if b.Shell == nil {
 			return "", fmt.Errorf("shell backend is required")
 		}
-		resp, err := b.Shell.Execute(ctx, &filesystem.ExecuteRequest{
+		resp, err := b.Shell.Execute(ctx, &CommandExecuteRequest{
 			Command: rendered.command,
 			Cwd:     rendered.cwd,
 		})
 		if err != nil {
 			return "", err
+		}
+		if resp == nil {
+			return "", fmt.Errorf("shell backend returned nil response")
 		}
 		var sb strings.Builder
 		sb.WriteString(resp.Output)

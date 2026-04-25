@@ -72,12 +72,12 @@ func (c *Compiler) Compile(ctx context.Context, plan ExecutionPlan, opts ...comp
 	}
 	blockKinds := blockKindsByNode(plan)
 	staticInputs := staticInputsFromPlan(plan)
-	boundaryProjections := boundaryProjectionByEntry(plan)
-	boundaryVisibility := boundaryVisibilityByEntry(plan)
+	subgraphProjections := subgraphProjectionByEntry(plan)
+	subgraphVisibility := subgraphVisibilityByEntry(plan)
 	for _, node := range plan.Structural.Nodes {
 		binding := bindingByRef(plan, node.Binding)
 		policy := policyByRef(plan, node.Policy)
-		if err := validateBoundaryBinding(node, boundaryVisibility[node.ID]); err != nil {
+		if err := validateSubGraphBinding(node, subgraphVisibility[node.ID]); err != nil {
 			return nil, err
 		}
 		resolved, err := resolver.ResolveNode(ctx, node, binding, policy)
@@ -86,7 +86,7 @@ func (c *Compiler) Compile(ctx context.Context, plan ExecutionPlan, opts ...comp
 		}
 		resolved = wrapWithStaticInput(node.ID, resolved, staticInputs[node.ID])
 		resolved = wrapWithNodeMetadata(node.ID, resolved, node.Metadata)
-		resolved = wrapWithBoundaryProjection(node.ID, resolved, boundaryProjections[node.ID])
+		resolved = wrapWithSubGraphProjection(node.ID, resolved, subgraphProjections[node.ID])
 		if err := addResolvedNode(graph, node, resolved); err != nil {
 			return nil, fmt.Errorf("add node %q: %w", node.ID, err)
 		}
@@ -546,29 +546,29 @@ func staticInputsFromPlan(_ ExecutionPlan) map[NodeID]map[string]any {
 	return map[NodeID]map[string]any{}
 }
 
-func boundaryProjectionByEntry(plan ExecutionPlan) map[NodeID]*BoundaryProjectionSpec {
-	out := make(map[NodeID]*BoundaryProjectionSpec)
-	for _, boundary := range plan.Structural.Boundaries {
-		if boundary.EntryNode != "" {
-			projection := boundary.Projection
-			out[boundary.EntryNode] = projection
+func subgraphProjectionByEntry(plan ExecutionPlan) map[NodeID]*SubGraphProjectionSpec {
+	out := make(map[NodeID]*SubGraphProjectionSpec)
+	for _, subgraph := range plan.Structural.Boundaries {
+		if subgraph.EntryNode != "" {
+			projection := subgraph.Projection
+			out[subgraph.EntryNode] = projection
 		}
 	}
 	return out
 }
 
-func boundaryVisibilityByEntry(plan ExecutionPlan) map[NodeID]*BoundaryVisibilitySpec {
-	out := make(map[NodeID]*BoundaryVisibilitySpec)
-	for _, boundary := range plan.Structural.Boundaries {
-		if boundary.EntryNode != "" {
-			visibility := boundary.Visibility
-			out[boundary.EntryNode] = visibility
+func subgraphVisibilityByEntry(plan ExecutionPlan) map[NodeID]*SubGraphVisibilitySpec {
+	out := make(map[NodeID]*SubGraphVisibilitySpec)
+	for _, subgraph := range plan.Structural.Boundaries {
+		if subgraph.EntryNode != "" {
+			visibility := subgraph.Visibility
+			out[subgraph.EntryNode] = visibility
 		}
 	}
 	return out
 }
 
-func validateBoundaryBinding(_ PlannedNode, _ *BoundaryVisibilitySpec) error {
+func validateSubGraphBinding(_ PlannedNode, _ *SubGraphVisibilitySpec) error {
 	return nil
 }
 
@@ -580,7 +580,7 @@ func wrapWithNodeMetadata(_ NodeID, resolved any, _ map[string]any) any {
 	return resolved
 }
 
-func wrapWithBoundaryProjection(_ NodeID, resolved any, _ *BoundaryProjectionSpec) any {
+func wrapWithSubGraphProjection(_ NodeID, resolved any, _ *SubGraphProjectionSpec) any {
 	return resolved
 }
 

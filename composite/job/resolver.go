@@ -6,23 +6,38 @@ import (
 	"reflect"
 
 	"github.com/cloudwego/eino/compose"
-	schemad "github.com/cloudwego/eino/schema/declarative"
 	skillpkg "github.com/cloudwego/eino/composite/skill"
-	orcbp "github.com/maizenut/mirroru/orchestration/blueprint"
-	orccompiler "github.com/maizenut/mirroru/orchestration/compiler"
+	schemad "github.com/cloudwego/eino/schema/declarative"
 )
+
+type DocumentLoader interface {
+	LoadGraphSpec(ctx context.Context, ref schemad.Ref) (*schemad.GraphSpec, error)
+	LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error)
+	LoadNode(ctx context.Context, ref schemad.Ref) (*schemad.NodeSpec, error)
+}
+
+type GraphAssembler interface {
+	AssembleGraph(ctx context.Context, spec *schemad.GraphSpec) (compose.AnyGraph, error)
+}
+
+type InterpreterResolver interface {
+	ResolveComponent(ctx context.Context, ref schemad.Ref) (any, error)
+	ResolveFunction(ctx context.Context, ref schemad.Ref) (any, error)
+	ResolveGraph(ctx context.Context, ref schemad.Ref) (compose.AnyGraph, error)
+}
 
 // Resolver resolves task refs into runtime runnables.
 type Resolver struct {
-	Documents           orcbp.DocumentLoader
+	Documents           DocumentLoader
 	ComponentFactory    schemad.ComponentFactory
 	SkillLoader         skillpkg.SpecLoader
 	SkillAssembler      skillpkg.Assembler
-	InterpreterResolver orcbp.InterpreterResolver
+	InterpreterResolver InterpreterResolver
+	GraphAssembler      GraphAssembler
 }
 
 // NewResolver creates a job resolver backed by shared declarative infrastructure.
-func NewResolver(documents orcbp.DocumentLoader, factory schemad.ComponentFactory, skillLoader skillpkg.SpecLoader, skillAssembler skillpkg.Assembler, interpreter orcbp.InterpreterResolver) *Resolver {
+func NewResolver(documents DocumentLoader, factory schemad.ComponentFactory, skillLoader skillpkg.SpecLoader, skillAssembler skillpkg.Assembler, interpreter InterpreterResolver) *Resolver {
 	return &Resolver{
 		Documents:           documents,
 		ComponentFactory:    factory,
@@ -30,6 +45,11 @@ func NewResolver(documents orcbp.DocumentLoader, factory schemad.ComponentFactor
 		SkillAssembler:      skillAssembler,
 		InterpreterResolver: interpreter,
 	}
+}
+
+func (r *Resolver) WithGraphAssembler(assembler GraphAssembler) *Resolver {
+	r.GraphAssembler = assembler
+	return r
 }
 
 // Resolve resolves the task target into an executable Runnable.
@@ -66,13 +86,14 @@ func (r *Resolver) ResolveGraph(ctx context.Context, ref schemad.Ref) (compose.A
 		if r.Documents == nil {
 			return nil, fmt.Errorf("document loader is required for graph ref %s", ref.Target)
 		}
-		loader := &orcbp.Loader{Documents: r.Documents}
-		bp, err := loader.LoadGraph(ctx, ref)
+		if r.GraphAssembler == nil {
+			return nil, fmt.Errorf("graph assembler is required for graph ref %s", ref.Target)
+		}
+		spec, err := r.Documents.LoadGraphSpec(ctx, ref)
 		if err != nil {
 			return nil, err
 		}
-		builder := orccompiler.NewSpecCompiler(r.Documents, r.ComponentFactory, r.InterpreterResolver, nil)
-		return builder.AssembleGraph(ctx, bp)
+		return r.GraphAssembler.AssembleGraph(ctx, spec)
 	case schemad.RefKindInterpreterGraph:
 		if r.InterpreterResolver == nil {
 			return nil, fmt.Errorf("interpreter resolver is required for graph ref %s", ref.Target)
@@ -123,8 +144,7 @@ func (r *Resolver) ResolveValue(ctx context.Context, ref schemad.Ref) (any, erro
 		if r.Documents == nil {
 			return nil, fmt.Errorf("document loader is required for component ref %s", ref.Target)
 		}
-		loader := &orcbp.Loader{Documents: r.Documents}
-		spec, err := loader.LoadComponent(ctx, ref)
+		spec, err := r.Documents.LoadComponentSpec(ctx, ref.Target)
 		if err != nil {
 			return nil, err
 		}
@@ -169,8 +189,7 @@ func (r *Resolver) resolveBlueprintValue(ctx context.Context, ref schemad.Ref) (
 	if selectSpec.Kind != "node" {
 		return nil, fmt.Errorf("unsupported blueprint select kind %s for ref %s", selectSpec.Kind, ref.Target)
 	}
-	loader := &orcbp.Loader{Documents: r.Documents}
-	node, err := loader.LoadNode(ctx, ref)
+	node, err := r.Documents.LoadNode(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +210,7 @@ func (r *Resolver) resolveBlueprintNode(ctx context.Context, node *schemad.NodeS
 			if r.Documents == nil {
 				return nil, fmt.Errorf("document loader is required for component node %s", node.Key)
 			}
-			loader := &orcbp.Loader{Documents: r.Documents}
-			spec, err := loader.LoadComponent(ctx, node.Component.Ref)
+			spec, err := r.Documents.LoadComponentSpec(ctx, node.Component.Ref.Target)
 			if err != nil {
 				return nil, err
 			}
@@ -296,7 +314,7 @@ func validateNamedSelect(ref schemad.Ref, actualName, expectedKind string) error
 }
 
 type componentResolverAdapter struct {
-	resolver orcbp.InterpreterResolver
+	resolver InterpreterResolver
 }
 
 func (a componentResolverAdapter) ResolveComponent(ctx context.Context, ref schemad.Ref) (any, error) {
