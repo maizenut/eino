@@ -35,6 +35,14 @@ type graphAddNodeOpts struct {
 //	graph.AddNode("node_name", node, compose.WithInputKey("input_key"), compose.WithOutputKey("output_key"))
 type GraphAddNodeOpt func(o *graphAddNodeOpts)
 
+// GraphAddNodeOptionInfo exposes node option metadata for graph introspection.
+type GraphAddNodeOptionInfo struct {
+	InputKey             string
+	OutputKey            string
+	UsedStatePreHandler  bool
+	UsedStatePostHandler bool
+}
+
 type nodeOptions struct {
 	nodeName string
 
@@ -165,4 +173,22 @@ func getGraphAddNodeOpts(opts ...GraphAddNodeOpt) *graphAddNodeOpts {
 	}
 
 	return opt
+}
+
+// InspectGraphAddNodeOptions returns read-only metadata from graph node options.
+func InspectGraphAddNodeOptions(opts ...GraphAddNodeOpt) GraphAddNodeOptionInfo {
+	parsed := getGraphAddNodeOpts(opts...)
+	info := GraphAddNodeOptionInfo{}
+	if parsed == nil {
+		return info
+	}
+	if parsed.nodeOptions != nil {
+		info.InputKey = parsed.nodeOptions.inputKey
+		info.OutputKey = parsed.nodeOptions.outputKey
+	}
+	if parsed.processor != nil {
+		info.UsedStatePreHandler = parsed.processor.statePreHandler != nil
+		info.UsedStatePostHandler = parsed.processor.statePostHandler != nil
+	}
+	return info
 }

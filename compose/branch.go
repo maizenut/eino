@@ -54,6 +54,14 @@ func (gb *GraphBranch) GetEndNode() map[string]bool {
 	return gb.endNodes
 }
 
+// NoDataFlow reports whether the branch only controls routing without data flow.
+func (gb *GraphBranch) NoDataFlow() bool {
+	if gb == nil {
+		return false
+	}
+	return gb.noDataFlow
+}
+
 func newGraphBranch[T any](r *runnablePacker[T, []string, any], endNodes map[string]bool) *GraphBranch {
 	return &GraphBranch{
 		invoke: func(ctx context.Context, input any) (output []string, err error) {

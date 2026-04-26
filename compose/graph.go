@@ -969,6 +969,7 @@ func (g *graph) toGraphInfo(opt *graphCompileOptions, key2SubGraphs map[string]*
 					inputType:     b.inputType,
 					genericHelper: b.genericHelper,
 					endNodes:      gmap.Clone(b.endNodes),
+					noDataFlow:    b.noDataFlow,
 				})
 			}
 			return startNode, branchInfo
