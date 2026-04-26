@@ -13,7 +13,7 @@ import (
 )
 
 type GraphAssembler interface {
-	AssembleGraph(ctx context.Context, blueprint *schemad.GraphSpec) (compose.AnyGraph, error)
+	AssembleGraph(ctx context.Context, graphSpec *schemad.GraphSpec) (compose.AnyGraph, error)
 }
 
 type InterpreterResolver interface {

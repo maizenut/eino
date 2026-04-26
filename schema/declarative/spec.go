@@ -8,7 +8,6 @@ import (
 
 const (
 	RefKindGraphDocument        = "graph_document"
-	RefKindBlueprintDocument    = RefKindGraphDocument
 	RefKindComponentDocument    = "component_document"
 	RefKindSkillDocument        = "skill_document"
 	RefKindInterpreterFunction  = "interpreter_function"
@@ -82,9 +81,17 @@ type SubGraphPolicy struct {
 	Metadata         map[string]any `json:"metadata,omitempty"`
 }
 
+type SubGraphDelegateSpec struct {
+	SpecRef        *Ref           `json:"spec_ref,omitempty"`
+	CompileOptions map[string]any `json:"compile_options,omitempty"`
+	StoreRef       *Ref           `json:"store_ref,omitempty"`
+	SinkRef        *Ref           `json:"sink_ref,omitempty"`
+}
+
 type SubGraphNodeSpec struct {
-	Enabled bool            `json:"enabled,omitempty"`
-	Policy  *SubGraphPolicy `json:"policy,omitempty"`
+	Enabled  bool                  `json:"enabled,omitempty"`
+	Policy   *SubGraphPolicy       `json:"policy,omitempty"`
+	Delegate *SubGraphDelegateSpec `json:"delegate,omitempty"`
 }
 
 // NodeSpec declares a graph node.
@@ -122,10 +129,6 @@ type GraphSpec struct {
 	WorkflowNodes []WorkflowNodeSpec `json:"workflow_nodes,omitempty"`
 	Options       map[string]any     `json:"options,omitempty"`
 }
-
-// GraphBlueprint is kept as a compatibility alias while the codebase converges
-// on GraphSpec terminology.
-type GraphBlueprint = GraphSpec
 
 // ComponentKind normalizes a spec kind into a components.Component value.
 func ComponentKind(kind string) components.Component {

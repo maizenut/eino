@@ -139,7 +139,7 @@ func (r *Resolver) ResolveSkill(ctx context.Context, ref schemad.Ref) (skillpkg.
 func (r *Resolver) ResolveValue(ctx context.Context, ref schemad.Ref) (any, error) {
 	switch ref.Kind {
 	case schemad.RefKindGraphDocument:
-		return r.resolveBlueprintValue(ctx, ref)
+		return r.resolveGraphSpecValue(ctx, ref)
 	case schemad.RefKindComponentDocument:
 		if r.Documents == nil {
 			return nil, fmt.Errorf("document loader is required for component ref %s", ref.Target)
@@ -172,12 +172,12 @@ func (r *Resolver) ResolveValue(ctx context.Context, ref schemad.Ref) (any, erro
 	}
 }
 
-func (r *Resolver) resolveBlueprintValue(ctx context.Context, ref schemad.Ref) (any, error) {
+func (r *Resolver) resolveGraphSpecValue(ctx context.Context, ref schemad.Ref) (any, error) {
 	if ref.Select == "" {
 		return r.ResolveGraph(ctx, ref)
 	}
 	if r.Documents == nil {
-		return nil, fmt.Errorf("document loader is required for blueprint ref %s", ref.Target)
+		return nil, fmt.Errorf("document loader is required for graph spec ref %s", ref.Target)
 	}
 	selectSpec, err := schemad.ParseSelect(ref.Select)
 	if err != nil {
@@ -187,18 +187,18 @@ func (r *Resolver) resolveBlueprintValue(ctx context.Context, ref schemad.Ref) (
 		return r.ResolveGraph(ctx, ref)
 	}
 	if selectSpec.Kind != "node" {
-		return nil, fmt.Errorf("unsupported blueprint select kind %s for ref %s", selectSpec.Kind, ref.Target)
+		return nil, fmt.Errorf("unsupported graph spec select kind %s for ref %s", selectSpec.Kind, ref.Target)
 	}
 	node, err := r.Documents.LoadNode(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	return r.resolveBlueprintNode(ctx, node)
+	return r.resolveGraphSpecNode(ctx, node)
 }
 
-func (r *Resolver) resolveBlueprintNode(ctx context.Context, node *schemad.NodeSpec) (any, error) {
+func (r *Resolver) resolveGraphSpecNode(ctx context.Context, node *schemad.NodeSpec) (any, error) {
 	if node == nil {
-		return nil, fmt.Errorf("blueprint node is required")
+		return nil, fmt.Errorf("graph spec node is required")
 	}
 	switch node.Kind {
 	case schemad.NodeKindComponent:
@@ -243,7 +243,7 @@ func (r *Resolver) resolveBlueprintNode(ctx context.Context, node *schemad.NodeS
 			return input, nil
 		}), nil
 	default:
-		return nil, fmt.Errorf("unsupported blueprint node kind %s", node.Kind)
+		return nil, fmt.Errorf("unsupported graph spec node kind %s", node.Kind)
 	}
 }
 

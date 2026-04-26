@@ -26,7 +26,3 @@ type WorkflowNodeSpec struct {
 	Inputs      []WorkflowInputSpec `json:"inputs,omitempty"`
 	StaticValue map[string]any      `json:"static_value,omitempty"`
 }
-
-type GraphEdgeBlueprint = EdgeSpec
-type WorkflowInputBlueprint = WorkflowInputSpec
-type WorkflowNodeBlueprint = WorkflowNodeSpec

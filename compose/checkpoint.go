@@ -150,12 +150,53 @@ type checkpoint struct {
 
 type stateModifierKey struct{}
 type checkPointKey struct{} // *checkpoint
+type checkPointRunContextKey struct{}
+
+type CheckPointRunContext struct {
+	CheckPointID        string
+	WriteToCheckPointID string
+}
 
 func getStateModifier(ctx context.Context) StateModifier {
 	if sm, ok := ctx.Value(stateModifierKey{}).(StateModifier); ok {
 		return sm
 	}
 	return nil
+}
+
+func withCheckPointRunContext(ctx context.Context, checkPointID *string, writeToCheckPointID *string) context.Context {
+	if checkPointID == nil && writeToCheckPointID == nil {
+		return ctx
+	}
+	info := CheckPointRunContext{}
+	if checkPointID != nil {
+		info.CheckPointID = *checkPointID
+	}
+	if writeToCheckPointID != nil {
+		info.WriteToCheckPointID = *writeToCheckPointID
+	}
+	return context.WithValue(ctx, checkPointRunContextKey{}, info)
+}
+
+func CheckPointRunContextFromContext(ctx context.Context) (CheckPointRunContext, bool) {
+	info, ok := ctx.Value(checkPointRunContextKey{}).(CheckPointRunContext)
+	return info, ok
+}
+
+func CheckPointIDFromContext(ctx context.Context) (string, bool) {
+	info, ok := CheckPointRunContextFromContext(ctx)
+	if !ok || info.CheckPointID == "" {
+		return "", false
+	}
+	return info.CheckPointID, true
+}
+
+func WriteToCheckPointIDFromContext(ctx context.Context) (string, bool) {
+	info, ok := CheckPointRunContextFromContext(ctx)
+	if !ok || info.WriteToCheckPointID == "" {
+		return "", false
+	}
+	return info.WriteToCheckPointID, true
 }
 
 func setStateModifier(ctx context.Context, modifier StateModifier) context.Context {

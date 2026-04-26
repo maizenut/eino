@@ -362,15 +362,6 @@ func (s *stubDocumentLoader) LoadGraphSpec(ctx context.Context, ref schemad.Ref)
 	return s.graph, nil
 }
 
-func (s *stubDocumentLoader) LoadGraphBlueprint(ctx context.Context, target string) (*schemad.GraphBlueprint, error) {
-	_ = ctx
-	_ = target
-	if s.graph == nil {
-		return nil, nil
-	}
-	return &schemad.GraphBlueprint{Name: s.graph.Name}, nil
-}
-
 func (s *stubDocumentLoader) LoadComponentSpec(ctx context.Context, target string) (*schemad.ComponentSpec, error) {
 	_ = ctx
 	_ = target

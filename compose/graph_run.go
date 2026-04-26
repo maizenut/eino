@@ -160,6 +160,7 @@ func (r *runner) run(ctx context.Context, isStream bool, input any, opts ...Opti
 	if checkPointID != nil && r.checkPointer.store == nil {
 		return nil, newGraphRunError(fmt.Errorf("receive checkpoint id but have not set checkpoint store"))
 	}
+	ctx = withCheckPointRunContext(ctx, checkPointID, writeToCheckPointID)
 
 	// Extract subgraph
 	path, isSubGraph := getNodePath(ctx)
