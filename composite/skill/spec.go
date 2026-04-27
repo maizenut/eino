@@ -23,8 +23,15 @@ type TriggerSpec struct {
 type CommandToolSpec struct {
 	Name        string               `json:"name" yaml:"name"`
 	Description string               `json:"description,omitempty" yaml:"description,omitempty"`
+	Kind        string               `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Parameters  *CommandParamsSpec   `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Command     CommandExecutionSpec `json:"command" yaml:"command"`
+}
+
+type CommandProfileSpec struct {
+	Executable  string   `json:"executable,omitempty" yaml:"executable,omitempty"`
+	DefaultArgs []string `json:"default_args,omitempty" yaml:"default_args,omitempty"`
+	Cwd         string   `json:"cwd,omitempty" yaml:"cwd,omitempty"`
 }
 
 type CommandParamsSpec struct {
@@ -52,13 +59,14 @@ type CommandExecutionSpec struct {
 
 // SkillSpec is the static declarative definition of a skill.
 type SkillSpec struct {
-	Info         Info              `json:"info" yaml:"info"`
-	Trigger      *TriggerSpec      `json:"trigger,omitempty" yaml:"trigger,omitempty"`
-	Instruction  string            `json:"instruction,omitempty" yaml:"instruction,omitempty"`
-	ToolRefs     []schemad.Ref     `json:"tool_refs,omitempty" yaml:"tool_refs,omitempty"`
-	CommandTools []CommandToolSpec `json:"command_tools,omitempty" yaml:"command_tools,omitempty"`
-	GraphRef     *schemad.Ref      `json:"graph_ref,omitempty" yaml:"graph_ref,omitempty"`
-	PromptRef    *schemad.Ref      `json:"prompt_ref,omitempty" yaml:"prompt_ref,omitempty"`
-	ModelRef     *schemad.Ref      `json:"model_ref,omitempty" yaml:"model_ref,omitempty"`
-	Metadata     map[string]any    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Info           Info               `json:"info" yaml:"info"`
+	Trigger        *TriggerSpec       `json:"trigger,omitempty" yaml:"trigger,omitempty"`
+	Instruction    string             `json:"instruction,omitempty" yaml:"instruction,omitempty"`
+	ToolRefs       []schemad.Ref      `json:"tool_refs,omitempty" yaml:"tool_refs,omitempty"`
+	CommandProfile CommandProfileSpec `json:"command_profile,omitempty" yaml:"command_profile,omitempty"`
+	CommandTools   []CommandToolSpec  `json:"command_tools,omitempty" yaml:"command_tools,omitempty"`
+	GraphRef       *schemad.Ref       `json:"graph_ref,omitempty" yaml:"graph_ref,omitempty"`
+	PromptRef      *schemad.Ref       `json:"prompt_ref,omitempty" yaml:"prompt_ref,omitempty"`
+	ModelRef       *schemad.Ref       `json:"model_ref,omitempty" yaml:"model_ref,omitempty"`
+	Metadata       map[string]any     `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }

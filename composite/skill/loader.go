@@ -66,20 +66,21 @@ func resolveSpecFilePath(path string) string {
 }
 
 type skillDocument struct {
-	Info         Info              `json:"info" yaml:"info"`
-	Name         string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Description  string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Version      string            `json:"version,omitempty" yaml:"version,omitempty"`
-	Category     string            `json:"category,omitempty" yaml:"category,omitempty"`
-	Tags         []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Trigger      *TriggerSpec      `json:"trigger,omitempty" yaml:"trigger,omitempty"`
-	Instruction  string            `json:"instruction,omitempty" yaml:"instruction,omitempty"`
-	ToolRefs     []schemad.Ref     `json:"tool_refs,omitempty" yaml:"tool_refs,omitempty"`
-	CommandTools []CommandToolSpec `json:"command_tools,omitempty" yaml:"command_tools,omitempty"`
-	GraphRef     *schemad.Ref      `json:"graph_ref,omitempty" yaml:"graph_ref,omitempty"`
-	PromptRef    *schemad.Ref      `json:"prompt_ref,omitempty" yaml:"prompt_ref,omitempty"`
-	ModelRef     *schemad.Ref      `json:"model_ref,omitempty" yaml:"model_ref,omitempty"`
-	Metadata     map[string]any    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Info           Info               `json:"info" yaml:"info"`
+	Name           string             `json:"name,omitempty" yaml:"name,omitempty"`
+	Description    string             `json:"description,omitempty" yaml:"description,omitempty"`
+	Version        string             `json:"version,omitempty" yaml:"version,omitempty"`
+	Category       string             `json:"category,omitempty" yaml:"category,omitempty"`
+	Tags           []string           `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Trigger        *TriggerSpec       `json:"trigger,omitempty" yaml:"trigger,omitempty"`
+	Instruction    string             `json:"instruction,omitempty" yaml:"instruction,omitempty"`
+	ToolRefs       []schemad.Ref      `json:"tool_refs,omitempty" yaml:"tool_refs,omitempty"`
+	CommandProfile CommandProfileSpec `json:"command_profile,omitempty" yaml:"command_profile,omitempty"`
+	CommandTools   []CommandToolSpec  `json:"command_tools,omitempty" yaml:"command_tools,omitempty"`
+	GraphRef       *schemad.Ref       `json:"graph_ref,omitempty" yaml:"graph_ref,omitempty"`
+	PromptRef      *schemad.Ref       `json:"prompt_ref,omitempty" yaml:"prompt_ref,omitempty"`
+	ModelRef       *schemad.Ref       `json:"model_ref,omitempty" yaml:"model_ref,omitempty"`
+	Metadata       map[string]any     `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 var (
@@ -174,15 +175,16 @@ func (d *skillDocument) toSkillSpec(markdownInstruction string) *SkillSpec {
 		metadata = inferMarkdownMetadata(metadata, instruction)
 	}
 	return &SkillSpec{
-		Info:         info,
-		Trigger:      trigger,
-		Instruction:  instruction,
-		ToolRefs:     append([]schemad.Ref(nil), d.ToolRefs...),
-		CommandTools: append([]CommandToolSpec(nil), d.CommandTools...),
-		GraphRef:     d.GraphRef,
-		PromptRef:    d.PromptRef,
-		ModelRef:     d.ModelRef,
-		Metadata:     metadata,
+		Info:           info,
+		Trigger:        trigger,
+		Instruction:    instruction,
+		ToolRefs:       append([]schemad.Ref(nil), d.ToolRefs...),
+		CommandProfile: d.CommandProfile,
+		CommandTools:   append([]CommandToolSpec(nil), d.CommandTools...),
+		GraphRef:       d.GraphRef,
+		PromptRef:      d.PromptRef,
+		ModelRef:       d.ModelRef,
+		Metadata:       metadata,
 	}
 }
 

@@ -57,7 +57,7 @@ func (a *DefaultAssembler) Build(ctx context.Context, spec *SkillSpec) (Runnable
 			result.tools = make([]tool.BaseTool, 0, len(spec.CommandTools))
 		}
 		for _, commandTool := range spec.CommandTools {
-			toolValue, err := a.CommandToolBuilder.Build(commandTool)
+			toolValue, err := a.CommandToolBuilder.BuildWithProfile(commandTool, spec.CommandProfile)
 			if err != nil {
 				return nil, fmt.Errorf("build command tool %s: %w", commandTool.Name, err)
 			}

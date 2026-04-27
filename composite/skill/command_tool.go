@@ -40,6 +40,16 @@ type CommandShell interface {
 
 type CommandBackgroundJobs interface {
 	StartJob(ctx context.Context, command string, cwd string) (string, error)
+	GetJobOutput(ctx context.Context, jobID string) (string, error)
+	KillJob(ctx context.Context, jobID string) error
+	ListJobs(ctx context.Context) ([]CommandJobInfo, error)
+}
+
+type CommandJobInfo struct {
+	ID      string `json:"id"`
+	Status  string `json:"status"`
+	Command string `json:"command"`
+	Cwd     string `json:"cwd"`
 }
 
 type CommandToolBuilder struct {
@@ -57,10 +67,15 @@ func NewCommandToolBuilder(cfg CommandToolBuilderConfig) *CommandToolBuilder {
 }
 
 func (b *CommandToolBuilder) Build(spec CommandToolSpec) (ftool.BaseTool, error) {
+	return b.BuildWithProfile(spec, CommandProfileSpec{})
+}
+
+func (b *CommandToolBuilder) BuildWithProfile(spec CommandToolSpec, profile CommandProfileSpec) (ftool.BaseTool, error) {
 	if strings.TrimSpace(spec.Name) == "" {
 		return nil, fmt.Errorf("command tool name is required")
 	}
-	if len(spec.Command.Argv) == 0 && strings.TrimSpace(spec.Command.Command) == "" {
+	kind := normalizeCommandToolKind(spec.Kind, spec.Command.Background)
+	if commandToolKindNeedsCommand(kind) && len(spec.Command.Argv) == 0 && strings.TrimSpace(spec.Command.Command) == "" && strings.TrimSpace(profile.Executable) == "" {
 		return nil, fmt.Errorf("command tool %s requires command.argv or command.command", spec.Name)
 	}
 	if spec.Command.TimeoutMS > 0 {
@@ -76,11 +91,20 @@ func (b *CommandToolBuilder) Build(spec CommandToolSpec) (ftool.BaseTool, error)
 	}
 
 	return utils.NewTool(info, func(ctx context.Context, args map[string]any) (string, error) {
-		rendered, err := b.render(spec.Command, args)
+		switch kind {
+		case "filesystem.get_background_job_output":
+			return b.getBackgroundJobOutput(ctx, args)
+		case "filesystem.kill_background_job":
+			return b.killBackgroundJob(ctx, args)
+		case "filesystem.list_background_jobs":
+			return b.listBackgroundJobs(ctx)
+		}
+
+		rendered, err := b.render(spec.Command, profile, args)
 		if err != nil {
 			return "", err
 		}
-		if spec.Command.Background {
+		if kind == "filesystem.start_background_job" {
 			if b.Jobs == nil {
 				return "", fmt.Errorf("background jobs backend is required")
 			}
@@ -114,32 +138,84 @@ func (b *CommandToolBuilder) Build(spec CommandToolSpec) (ftool.BaseTool, error)
 	}), nil
 }
 
+func normalizeCommandToolKind(kind string, background bool) string {
+	trimmed := strings.TrimSpace(kind)
+	if trimmed == "" {
+		if background {
+			return "filesystem.start_background_job"
+		}
+		return "filesystem.execute"
+	}
+	switch trimmed {
+	case "execute":
+		return "filesystem.execute"
+	case "start_background", "start_background_job":
+		return "filesystem.start_background_job"
+	case "get_background", "get_background_job_output":
+		return "filesystem.get_background_job_output"
+	case "kill_background", "kill_background_job":
+		return "filesystem.kill_background_job"
+	case "list_background", "list_background_jobs":
+		return "filesystem.list_background_jobs"
+	default:
+		return trimmed
+	}
+}
+
+func commandToolKindNeedsCommand(kind string) bool {
+	switch kind {
+	case "filesystem.execute", "filesystem.start_background_job":
+		return true
+	case "filesystem.get_background_job_output", "filesystem.kill_background_job", "filesystem.list_background_jobs":
+		return false
+	default:
+		return true
+	}
+}
+
 type renderedCommand struct {
 	command string
 	cwd     string
 }
 
-func (b *CommandToolBuilder) render(spec CommandExecutionSpec, args map[string]any) (*renderedCommand, error) {
+func (b *CommandToolBuilder) render(spec CommandExecutionSpec, profile CommandProfileSpec, args map[string]any) (*renderedCommand, error) {
 	var command string
 	if len(spec.Argv) > 0 {
-		renderedArgv := make([]string, 0, len(spec.Argv))
+		renderedArgv := make([]string, 0, len(profile.DefaultArgs)+len(spec.Argv)+1)
+		if executable := strings.TrimSpace(profile.Executable); executable != "" {
+			renderedArgv = append(renderedArgv, executable)
+		}
+		renderedArgv = append(renderedArgv, profile.DefaultArgs...)
 		for _, arg := range spec.Argv {
-			renderedArg, err := renderCommandTemplate(arg, args)
+			renderedArgs, err := renderCommandArgvTemplate(arg, args)
 			if err != nil {
 				return nil, err
 			}
-			renderedArgv = append(renderedArgv, renderedArg)
+			renderedArgv = append(renderedArgv, renderedArgs...)
 		}
 		command = quoteArgv(renderedArgv)
 	} else {
-		renderedCommand, err := renderCommandTemplate(spec.Command, args)
-		if err != nil {
-			return nil, err
+		if strings.TrimSpace(spec.Command) != "" {
+			renderedCommand, err := renderCommandTemplate(spec.Command, args)
+			if err != nil {
+				return nil, err
+			}
+			command = renderedCommand
+		} else {
+			renderedArgv := make([]string, 0, len(profile.DefaultArgs)+1)
+			if executable := strings.TrimSpace(profile.Executable); executable != "" {
+				renderedArgv = append(renderedArgv, executable)
+			}
+			renderedArgv = append(renderedArgv, profile.DefaultArgs...)
+			command = quoteArgv(renderedArgv)
 		}
-		command = renderedCommand
 	}
 
-	renderedCwd, err := renderCommandTemplate(spec.Cwd, args)
+	cwdTemplate := spec.Cwd
+	if strings.TrimSpace(cwdTemplate) == "" {
+		cwdTemplate = profile.Cwd
+	}
+	renderedCwd, err := renderCommandTemplate(cwdTemplate, args)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +224,57 @@ func (b *CommandToolBuilder) render(spec CommandExecutionSpec, args map[string]a
 	}
 
 	return &renderedCommand{command: command, cwd: renderedCwd}, nil
+}
+
+func (b *CommandToolBuilder) getBackgroundJobOutput(ctx context.Context, args map[string]any) (string, error) {
+	if b.Jobs == nil {
+		return "", fmt.Errorf("background jobs backend is required")
+	}
+	jobID := commandJobID(args)
+	if jobID == "" {
+		return "", fmt.Errorf("job_id is required")
+	}
+	return b.Jobs.GetJobOutput(ctx, jobID)
+}
+
+func (b *CommandToolBuilder) killBackgroundJob(ctx context.Context, args map[string]any) (string, error) {
+	if b.Jobs == nil {
+		return "", fmt.Errorf("background jobs backend is required")
+	}
+	jobID := commandJobID(args)
+	if jobID == "" {
+		return "", fmt.Errorf("job_id is required")
+	}
+	if err := b.Jobs.KillJob(ctx, jobID); err != nil {
+		return "", err
+	}
+	return "OK", nil
+}
+
+func (b *CommandToolBuilder) listBackgroundJobs(ctx context.Context) (string, error) {
+	if b.Jobs == nil {
+		return "", fmt.Errorf("background jobs backend is required")
+	}
+	jobs, err := b.Jobs.ListJobs(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(jobs) == 0 {
+		return "No jobs found", nil
+	}
+	var sb strings.Builder
+	for _, job := range jobs {
+		fmt.Fprintf(&sb, "%s\t%s\t%s\n", job.ID, job.Status, job.Command)
+	}
+	return strings.TrimRight(sb.String(), "\n"), nil
+}
+
+func commandJobID(args map[string]any) string {
+	jobID := strings.TrimSpace(fmt.Sprint(args["job_id"]))
+	if jobID == "<nil>" {
+		return ""
+	}
+	return jobID
 }
 
 func (b *CommandToolBuilder) resolveCwd(renderedCwd string) string {
@@ -263,6 +390,36 @@ func renderCommandTemplate(template string, args map[string]any) (string, error)
 	return rendered, nil
 }
 
+func renderCommandArgvTemplate(template string, args map[string]any) ([]string, error) {
+	if template == "" {
+		return []string{""}, nil
+	}
+	if key, ok := wholeCommandTemplateKey(template); ok {
+		value, exists := args[key]
+		if !exists {
+			return []string{""}, nil
+		}
+		values, err := stringifyCommandArgvValue(value)
+		if err != nil {
+			return nil, fmt.Errorf("render command argument %q: %w", key, err)
+		}
+		return values, nil
+	}
+	rendered, err := renderCommandTemplate(template, args)
+	if err != nil {
+		return nil, err
+	}
+	return []string{rendered}, nil
+}
+
+func wholeCommandTemplateKey(template string) (string, bool) {
+	matches := commandTemplatePattern.FindStringSubmatch(template)
+	if len(matches) != 2 || strings.TrimSpace(template) != matches[0] {
+		return "", false
+	}
+	return matches[1], true
+}
+
 func stringifyCommandValue(value any) (string, error) {
 	switch typed := value.(type) {
 	case nil:
@@ -279,6 +436,29 @@ func stringifyCommandValue(value any) (string, error) {
 			return "", err
 		}
 		return string(data), nil
+	}
+}
+
+func stringifyCommandArgvValue(value any) ([]string, error) {
+	switch typed := value.(type) {
+	case []string:
+		return append([]string(nil), typed...), nil
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, err := stringifyCommandValue(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, text)
+		}
+		return out, nil
+	default:
+		text, err := stringifyCommandValue(value)
+		if err != nil {
+			return nil, err
+		}
+		return []string{text}, nil
 	}
 }
 

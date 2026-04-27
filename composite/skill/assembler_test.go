@@ -351,6 +351,102 @@ func TestDefaultAssemblerBuild_CommandTools_WorkspaceRelativeCwdAvoidsDoubleWork
 	}
 }
 
+func TestDefaultAssemblerBuild_CommandTools_ProfileExpandsArrayArgs(t *testing.T) {
+	resolver := NewResolver(nil, nil, nil)
+	assembler := NewAssembler(resolver)
+	assembler.CommandToolBuilder = NewCommandToolBuilder(CommandToolBuilderConfig{
+		WorkspaceRoot: "/workspace-root",
+		Shell:         fakeCommandShell{},
+	})
+
+	runnable, err := assembler.Build(context.Background(), &SkillSpec{
+		Info: Info{Name: "bytedcli"},
+		CommandProfile: CommandProfileSpec{
+			Executable:  "bytedcli",
+			DefaultArgs: []string{"--json"},
+			Cwd:         "workspace/skills/bytedcli",
+		},
+		CommandTools: []CommandToolSpec{{
+			Name: "execute",
+			Kind: "filesystem.execute",
+			Parameters: &CommandParamsSpec{
+				Required: []string{"domain", "args"},
+				Properties: map[string]CommandParamSchema{
+					"domain": {Type: "string"},
+					"args": {
+						Type:  "array",
+						Items: &CommandParamSchema{Type: "string"},
+					},
+				},
+			},
+			Command: CommandExecutionSpec{Argv: []string{"{{domain}}", "{{args}}"}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	tools, err := runnable.Tools(context.Background())
+	if err != nil {
+		t.Fatalf("Tools: %v", err)
+	}
+	invokable := tools[0].(ftool.InvokableTool)
+	output, err := invokable.InvokableRun(context.Background(), `{"domain":"auth","args":["status","--site","cn"]}`)
+	if err != nil {
+		t.Fatalf("InvokableRun: %v", err)
+	}
+	for _, want := range []string{"'bytedcli'", "'--json'", "'auth'", "'status'", "'--site'", "'cn'"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output = %q, want %s", output, want)
+		}
+	}
+	if strings.Contains(output, "[\"status\"") {
+		t.Fatalf("output = %q, args array should be expanded", output)
+	}
+}
+
+func TestDefaultAssemblerBuild_CommandTools_BackgroundJobKinds(t *testing.T) {
+	resolver := NewResolver(nil, nil, nil)
+	jobs := &fakeCommandJobs{}
+	assembler := NewAssembler(resolver)
+	assembler.CommandToolBuilder = NewCommandToolBuilder(CommandToolBuilderConfig{
+		WorkspaceRoot: "/workspace-root",
+		Jobs:          jobs,
+	})
+
+	runnable, err := assembler.Build(context.Background(), &SkillSpec{
+		Info:           Info{Name: "bytedcli"},
+		CommandProfile: CommandProfileSpec{Executable: "bytedcli"},
+		CommandTools: []CommandToolSpec{
+			{Name: "start", Kind: "filesystem.start_background_job", Command: CommandExecutionSpec{Argv: []string{"auth", "status"}}},
+			{Name: "get", Kind: "filesystem.get_background_job_output"},
+			{Name: "kill", Kind: "filesystem.kill_background_job"},
+			{Name: "list", Kind: "filesystem.list_background_jobs"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	tools, err := runnable.Tools(context.Background())
+	if err != nil {
+		t.Fatalf("Tools: %v", err)
+	}
+	if len(tools) != 4 {
+		t.Fatalf("len(Tools) = %d, want 4", len(tools))
+	}
+	startOut, err := tools[0].(ftool.InvokableTool).InvokableRun(context.Background(), `{}`)
+	if err != nil || startOut != "job-1" {
+		t.Fatalf("start = %q, %v", startOut, err)
+	}
+	getOut, err := tools[1].(ftool.InvokableTool).InvokableRun(context.Background(), `{"job_id":"job-1"}`)
+	if err != nil || getOut != "job output" {
+		t.Fatalf("get = %q, %v", getOut, err)
+	}
+	listOut, err := tools[3].(ftool.InvokableTool).InvokableRun(context.Background(), `{}`)
+	if err != nil || !strings.Contains(listOut, "job-1") {
+		t.Fatalf("list = %q, %v", listOut, err)
+	}
+}
+
 type stubDocumentLoader struct {
 	component *schemad.ComponentSpec
 	graph     *schemad.GraphSpec
@@ -408,6 +504,32 @@ type fakeCommandShell struct{}
 func (fakeCommandShell) Execute(ctx context.Context, req *CommandExecuteRequest) (*CommandExecuteResponse, error) {
 	_ = ctx
 	return &CommandExecuteResponse{Output: req.Command + " @ " + req.Cwd}, nil
+}
+
+type fakeCommandJobs struct{}
+
+func (f *fakeCommandJobs) StartJob(ctx context.Context, command string, cwd string) (string, error) {
+	_ = ctx
+	_ = command
+	_ = cwd
+	return "job-1", nil
+}
+
+func (f *fakeCommandJobs) GetJobOutput(ctx context.Context, jobID string) (string, error) {
+	_ = ctx
+	_ = jobID
+	return "job output", nil
+}
+
+func (f *fakeCommandJobs) KillJob(ctx context.Context, jobID string) error {
+	_ = ctx
+	_ = jobID
+	return nil
+}
+
+func (f *fakeCommandJobs) ListJobs(ctx context.Context) ([]CommandJobInfo, error) {
+	_ = ctx
+	return []CommandJobInfo{{ID: "job-1", Status: "running", Command: "bytedcli auth status"}}, nil
 }
 
 func (s stubInterpreterResolver) ResolveObject(ctx context.Context, ref schemad.Ref) (any, error) {
