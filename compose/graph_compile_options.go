@@ -34,7 +34,6 @@ type graphCompileOptions struct {
 	nodeInterceptors         []NodeInterceptor
 	interceptorOrderStrategy composeinterceptor.OrderStrategy
 	interceptorOrderNames    []string
-	memoryOptions            *MemoryOptions
 
 	eagerDisabled bool
 
@@ -47,7 +46,6 @@ func newGraphCompileOptions(opts ...GraphCompileOption) *graphCompileOptions {
 	for _, o := range opts {
 		o(option)
 	}
-	ensureMemoryInterceptor(option)
 
 	option.origOpts = opts
 

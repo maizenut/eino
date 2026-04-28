@@ -10,13 +10,13 @@
 // The package is split into five layers that mirror the four-stage declarative
 // main path used by the skill package:
 //
-//	MemorySpec → Resolve Refs / Policies → Assembler.Build → RuntimeMemory
+//		MemorySpec → Resolve Refs / Policies → Assembler.Build → RuntimeMemory
 //
-//   - Store: raw record persistence and retrieval (implemented in eino-ext)
-//   - Policy: write, recall, compaction, and scope strategies
-//   - MemorySpec: static declaration (JSON/YAML-serialisable)
-//   - Assembler: converts a MemorySpec into a RuntimeMemory
-//   - Binding: hooks RuntimeMemory into graph / agent lifecycle events
+//	  - Store: raw record persistence and retrieval (implemented in eino-ext)
+//	  - Policy: write, recall, compaction, and scope strategies
+//	  - MemorySpec: static declaration (JSON/YAML-serialisable)
+//	  - Assembler: converts a MemorySpec into a RuntimeMemory
+//	  - Binding: hooks RuntimeMemory into graph / agent lifecycle events
 //
 // # Quick start
 //
@@ -41,11 +41,8 @@
 // read-fallback chain, and write target so that multi-tenant, multi-agent
 // deployments can share and isolate memory without custom wiring.
 //
-// # Compose integration
+// # Runtime integration
 //
-// The compose package exposes helpers for injecting memory into graph runs:
-//
-//	compose.WithMemory(mem)
-//	compose.WithMemoryBinding(binding)
-//	compose.WithMemorySpec(spec)
+// Memory binding into graph execution is provided by MirrorU runtime adapters,
+// for example github.com/maizenut/mirroru/interceptors/memorybinding.
 package memory

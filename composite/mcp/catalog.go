@@ -4,10 +4,10 @@ import "context"
 
 // ToolEntry binds a remote tool descriptor to its originating server id.
 type ToolEntry struct {
-	ServerID    string
-	Descriptor  ToolDescriptor
-	ServerSpec  *ServerSpec
-	ServerInfo  *ServerInfo
+	ServerID   string
+	Descriptor ToolDescriptor
+	ServerSpec *ServerSpec
+	ServerInfo *ServerInfo
 }
 
 // PromptEntry binds a remote prompt descriptor to its originating server id.
@@ -32,4 +32,3 @@ type Catalog interface {
 	ListAllPrompts(ctx context.Context, opts ...Option) ([]PromptEntry, error)
 	ListAllResources(ctx context.Context, opts ...Option) ([]ResourceEntry, error)
 }
-
