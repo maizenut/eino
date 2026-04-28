@@ -15,11 +15,21 @@ type ServerSpec struct {
 	URL         string            `json:"url,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
 	Metadata    map[string]any    `json:"metadata,omitempty"`
+	Tools       []ToolSpec        `json:"tools,omitempty"`
 	Retry       *RetryPolicy      `json:"retry,omitempty"`
 	AdapterRefs []declarative.Ref `json:"adapter_refs,omitempty"`
 	ToolRef     *declarative.Ref  `json:"tool_ref,omitempty"`
 	PromptRef   *declarative.Ref  `json:"prompt_ref,omitempty"`
 	ResourceRef *declarative.Ref  `json:"resource_ref,omitempty"`
+}
+
+// ToolSpec declares one remote MCP tool that should be bridged locally.
+type ToolSpec struct {
+	Name        string `json:"name,omitempty"`
+	RemoteName  string `json:"remote_name,omitempty"`
+	RefTarget   string `json:"ref_target,omitempty"`
+	Description string `json:"description,omitempty"`
+	Enabled     *bool  `json:"enabled,omitempty"`
 }
 
 // RetryPolicy describes reconnect behavior.
