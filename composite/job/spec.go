@@ -24,7 +24,7 @@ type TaskInfo struct {
 	ID          string         `json:"id"`
 	Name        string         `json:"name,omitempty"`
 	Description string         `json:"description,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
+	Hints       []string       `json:"hints,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 

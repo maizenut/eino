@@ -43,7 +43,7 @@ func cloneTaskSpec(task *TaskSpec) *TaskSpec {
 }
 
 func cloneTaskInfo(info TaskInfo) TaskInfo {
-	info.Tags = append([]string(nil), info.Tags...)
+	info.Hints = append([]string(nil), info.Hints...)
 	info.Metadata = copyMap(info.Metadata)
 	return info
 }

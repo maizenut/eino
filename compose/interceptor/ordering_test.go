@@ -26,8 +26,8 @@ type testInterceptor struct {
 	priority int
 }
 
-func (t *testInterceptor) Name() string    { return t.name }
-func (t *testInterceptor) Priority() int   { return t.priority }
+func (t *testInterceptor) Name() string  { return t.name }
+func (t *testInterceptor) Priority() int { return t.priority }
 
 type unnamedInterceptor struct {
 	*BaseNodeInterceptor
@@ -100,14 +100,14 @@ func TestSort_ByPriority_Stable(t *testing.T) {
 }
 
 func TestSort_ByNames(t *testing.T) {
-	a := &testInterceptor{name: "graphlogger", priority: 10}
+	a := &testInterceptor{name: "devops", priority: 10}
 	b := &testInterceptor{name: "summarization", priority: -5}
 	c := &testInterceptor{name: "reminder", priority: 0}
 
 	input := []NodeInterceptor{a, b, c}
-	result := Sort(input, OrderByNames, []string{"summarization", "reminder", "graphlogger"})
+	result := Sort(input, OrderByNames, []string{"summarization", "reminder", "devops"})
 
-	wantOrder := []string{"summarization", "reminder", "graphlogger"}
+	wantOrder := []string{"summarization", "reminder", "devops"}
 	gotOrder := names(result)
 	for i, want := range wantOrder {
 		if gotOrder[i] != want {
@@ -117,11 +117,11 @@ func TestSort_ByNames(t *testing.T) {
 }
 
 func TestSort_ByNames_UnnamedPlacedLast(t *testing.T) {
-	named := &testInterceptor{name: "graphlogger", priority: 10}
+	named := &testInterceptor{name: "devops", priority: 10}
 	unnamed := &BaseNodeInterceptor{}
 
 	input := []NodeInterceptor{unnamed, named}
-	result := Sort(input, OrderByNames, []string{"graphlogger"})
+	result := Sort(input, OrderByNames, []string{"devops"})
 
 	if len(result) != 2 {
 		t.Fatalf("len = %d, want 2", len(result))
@@ -135,12 +135,12 @@ func TestSort_ByNames_UnnamedPlacedLast(t *testing.T) {
 }
 
 func TestSort_ByNames_MissingNamePlacedLast(t *testing.T) {
-	a := &testInterceptor{name: "graphlogger", priority: 10}
+	a := &testInterceptor{name: "devops", priority: 10}
 	b := &testInterceptor{name: "summarization", priority: 5}
 	c := &testInterceptor{name: "reminder", priority: 0}
 
 	input := []NodeInterceptor{a, b, c}
-	result := Sort(input, OrderByNames, []string{"reminder", "graphlogger"})
+	result := Sort(input, OrderByNames, []string{"reminder", "devops"})
 
 	if result[0] != c || result[1] != a {
 		t.Fatalf("named interceptors should follow explicit order, got %v", names(result))

@@ -44,7 +44,7 @@ type Info struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Version     string         `json:"version,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
+	Hints       []string       `json:"hints,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 

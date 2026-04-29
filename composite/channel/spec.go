@@ -13,7 +13,7 @@ type Info struct {
 	Description string         `json:"description,omitempty"`
 	Version     string         `json:"version,omitempty"`
 	Category    string         `json:"category,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
+	Hints       []string       `json:"hints,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
