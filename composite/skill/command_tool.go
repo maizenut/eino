@@ -6,11 +6,14 @@ type CommandToolBuilderConfig struct {
 	WorkspaceRoot string
 	Shell         CommandShell
 	Jobs          CommandBackgroundJobs
+	Environments  any
 }
 
 type CommandExecuteRequest struct {
-	Command string
-	Cwd     string
+	Command         string
+	Cwd             string
+	EnvironmentName string
+	Environment     any
 }
 
 type CommandExecuteResponse struct {

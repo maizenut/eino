@@ -186,6 +186,13 @@ func (c *Chain[I, O]) AppendAgenticModel(node model.AgenticModel, opts ...GraphA
 	return c
 }
 
+// AppendAgenticRuntime adds an agentic runtime node to the chain.
+func (c *Chain[I, O]) AppendAgenticRuntime(node AgenticRuntime, opts ...GraphAddNodeOpt) *Chain[I, O] {
+	gNode, options := toAgenticRuntimeNode(node, opts...)
+	c.addNode(gNode, options)
+	return c
+}
+
 // AppendChatTemplate add a ChatTemplate node to the chain.
 // eg.
 //

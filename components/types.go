@@ -72,6 +72,8 @@ const (
 	ComponentOfChatModel Component = "ChatModel"
 	// ComponentOfAgenticModel identifies agentic model components.
 	ComponentOfAgenticModel Component = "AgenticModel"
+	// ComponentOfAgenticRuntime identifies agentic runtime components that execute an internal agent loop as a graph node.
+	ComponentOfAgenticRuntime Component = "AgenticRuntime"
 	// ComponentOfEmbedding identifies embedding components.
 	ComponentOfEmbedding Component = "Embedding"
 	// ComponentOfIndexer identifies indexer components.
@@ -85,3 +87,10 @@ const (
 	// ComponentOfTool identifies tool components.
 	ComponentOfTool Component = "Tool"
 )
+
+// IsModelLike reports whether a component accepts model conversation input.
+func IsModelLike(component Component) bool {
+	return component == ComponentOfChatModel ||
+		component == ComponentOfAgenticModel ||
+		component == ComponentOfAgenticRuntime
+}

@@ -95,6 +95,12 @@ func (wf *Workflow[I, O]) AddAgenticModelNode(key string, agenticModel model.Age
 	return wf.initNode(key)
 }
 
+// AddAgenticRuntimeNode adds an agentic runtime node and returns it.
+func (wf *Workflow[I, O]) AddAgenticRuntimeNode(key string, runtime AgenticRuntime, opts ...GraphAddNodeOpt) *WorkflowNode {
+	_ = wf.g.AddAgenticRuntimeNode(key, runtime, opts...)
+	return wf.initNode(key)
+}
+
 // AddChatTemplateNode adds a chat template node and returns it.
 func (wf *Workflow[I, O]) AddChatTemplateNode(key string, chatTemplate prompt.ChatTemplate, opts ...GraphAddNodeOpt) *WorkflowNode {
 	_ = wf.g.AddChatTemplateNode(key, chatTemplate, opts...)

@@ -143,6 +143,8 @@ func ComponentKind(kind string) components.Component {
 		return components.ComponentOfChatModel
 	case strings.ToLower(string(components.ComponentOfAgenticModel)), "agenticmodel":
 		return components.ComponentOfAgenticModel
+	case strings.ToLower(string(components.ComponentOfAgenticRuntime)), "agenticruntime":
+		return components.ComponentOfAgenticRuntime
 	case strings.ToLower(string(components.ComponentOfEmbedding)), "embedding":
 		return components.ComponentOfEmbedding
 	case strings.ToLower(string(components.ComponentOfIndexer)), "indexer":

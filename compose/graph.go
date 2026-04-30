@@ -366,6 +366,12 @@ func (g *graph) AddAgenticModelNode(key string, node model.AgenticModel, opts ..
 	return g.addNode(key, gNode, options)
 }
 
+// AddAgenticRuntimeNode adds a node that executes an internal agent loop.
+func (g *graph) AddAgenticRuntimeNode(key string, node AgenticRuntime, opts ...GraphAddNodeOpt) error {
+	gNode, options := toAgenticRuntimeNode(node, opts...)
+	return g.addNode(key, gNode, options)
+}
+
 // AddChatTemplateNode add node that implements prompt.ChatTemplate.
 // e.g.
 //

@@ -112,6 +112,18 @@ func toAgenticModelNode(node model.AgenticModel, opts ...GraphAddNodeOpt) (*grap
 	)
 }
 
+func toAgenticRuntimeNode(node AgenticRuntime, opts ...GraphAddNodeOpt) (*graphNode, *graphAddNodeOpts) {
+	return toComponentNode(
+		node,
+		components.ComponentOfAgenticRuntime,
+		node.Invoke,
+		nil,
+		nil,
+		nil,
+		opts...,
+	)
+}
+
 func toChatTemplateNode(node prompt.ChatTemplate, opts ...GraphAddNodeOpt) (*graphNode, *graphAddNodeOpts) {
 	return toComponentNode(
 		node,

@@ -43,14 +43,15 @@ type SkillToolSpec struct {
 }
 
 type SkillToolCommandSpec struct {
-	Tool       string         `json:"tool,omitempty" yaml:"tool,omitempty"`
-	Kind       string         `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Command    string         `json:"command,omitempty" yaml:"command,omitempty"`
-	Argv       []string       `json:"argv,omitempty" yaml:"argv,omitempty"`
-	Cwd        string         `json:"cwd,omitempty" yaml:"cwd,omitempty"`
-	Background bool           `json:"background,omitempty" yaml:"background,omitempty"`
-	TimeoutMS  int            `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	Env        map[string]any `json:"env,omitempty" yaml:"env,omitempty"`
+	Tool        string         `json:"tool,omitempty" yaml:"tool,omitempty"`
+	Kind        string         `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Environment string         `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Command     string         `json:"command,omitempty" yaml:"command,omitempty"`
+	Argv        []string       `json:"argv,omitempty" yaml:"argv,omitempty"`
+	Cwd         string         `json:"cwd,omitempty" yaml:"cwd,omitempty"`
+	Background  bool           `json:"background,omitempty" yaml:"background,omitempty"`
+	TimeoutMS   int            `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
+	Env         map[string]any `json:"env,omitempty" yaml:"env,omitempty"`
 }
 
 // SkillSpec is the static declarative definition of a skill.

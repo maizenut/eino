@@ -189,6 +189,7 @@ func TestComponentKind_Normalization(t *testing.T) {
 		"ChatModel":           componentpkg.ComponentOfChatModel,
 		"chat_model":          componentpkg.ComponentOfChatModel,
 		"agentic_model":       componentpkg.ComponentOfAgenticModel,
+		"agentic_runtime":     componentpkg.ComponentOfAgenticRuntime,
 		"embedding":           componentpkg.ComponentOfEmbedding,
 		"indexer":             componentpkg.ComponentOfIndexer,
 		"retriever":           componentpkg.ComponentOfRetriever,
