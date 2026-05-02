@@ -327,6 +327,33 @@ func (o *Option) getNodeInterceptors(nodeKey string) []NodeInterceptor {
 	return composeinterceptor.Sort(interceptors, o.interceptorOrderStrategy, o.interceptorOrderNames)
 }
 
+// NodeInterceptorsFromCallOptions returns the effective node interceptors for a
+// node declared by graph call options.
+func NodeInterceptorsFromCallOptions(nodeKey string, opts ...Option) []NodeInterceptor {
+	if len(opts) == 0 {
+		return nil
+	}
+	merged := Option{}
+	for _, opt := range opts {
+		merged.nodeInterceptors = append(merged.nodeInterceptors, opt.nodeInterceptors...)
+		if len(opt.nodeInterceptorByPath) > 0 {
+			if merged.nodeInterceptorByPath == nil {
+				merged.nodeInterceptorByPath = map[string][]NodeInterceptor{}
+			}
+			for path, interceptors := range opt.nodeInterceptorByPath {
+				merged.nodeInterceptorByPath[path] = append(merged.nodeInterceptorByPath[path], interceptors...)
+			}
+		}
+		if opt.interceptorOrderStrategy != OrderByInsertion {
+			merged.interceptorOrderStrategy = opt.interceptorOrderStrategy
+		}
+		if len(opt.interceptorOrderNames) > 0 {
+			merged.interceptorOrderNames = append([]string(nil), opt.interceptorOrderNames...)
+		}
+	}
+	return filterNilNodeInterceptors(merged.getNodeInterceptors(nodeKey))
+}
+
 func nodePathKey(path *NodePath) string {
 	if path == nil {
 		return ""
